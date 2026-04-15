@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>クイズ大会 - プレイヤー</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', 'Hiragino Sans', sans-serif;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .header {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            width: 100%;
+            padding: 15px 20px;
+            text-align: center;
+            font-size: 1.2em;
+            font-weight: bold;
+            border-bottom: 2px solid rgba(255,255,255,0.2);
+        }
+        .container {
+            max-width: 500px;
+            width: 100%;
+            padding: 20px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .team-select {
+            text-align: center;
+            width: 100%;
+        }
+        .team-select h2 {
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+        .team-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .team-btn {
+            padding: 18px 30px;
+            font-size: 1.2em;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+            color: #fff;
+        }
+        .team-btn:hover { transform: scale(1.05); filter: brightness(1.2); }
+        .team-btn:nth-child(1) { background: linear-gradient(135deg, #f093fb, #f5576c); }
+        .team-btn:nth-child(2) { background: linear-gradient(135deg, #4facfe, #00f2fe); }
+        .team-btn:nth-child(3) { background: linear-gradient(135deg, #43e97b, #38f9d7); }
+        .team-btn:nth-child(4) { background: linear-gradient(135deg, #fa709a, #fee140); }
+        .team-btn:nth-child(5) { background: linear-gradient(135deg, #a18cd1, #fbc2eb); }
+        .team-btn:nth-child(6) { background: linear-gradient(135deg, #fccb90, #d57eeb); }
+
+        .question-area {
+            text-align: center;
+            width: 100%;
+            display: none;
+        }
+        .team-badge {
+            display: inline-block;
+            padding: 5px 20px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            margin-bottom: 15px;
+            background: rgba(255,255,255,0.2);
+        }
+        .q-number {
+            font-size: 0.9em;
+            color: #aaa;
+            margin-bottom: 10px;
+        }
+        .q-text {
+            font-size: 1.4em;
+            font-weight: bold;
+            margin-bottom: 25px;
+            line-height: 1.5;
+        }
+        .q-points {
+            font-size: 0.85em;
+            color: #ffd700;
+            margin-bottom: 20px;
+        }
+        .choices {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .choice-btn {
+            padding: 16px 20px;
+            font-size: 1.1em;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 12px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .choice-btn:hover { background: rgba(255,255,255,0.25); border-color: #ffd700; }
+        .choice-btn.selected {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-color: #fff;
+            transform: scale(1.03);
+        }
+        .choice-btn:disabled { opacity: 0.5; cursor: default; }
+
+        .waiting-msg {
+            text-align: center;
+            display: none;
+        }
+        .waiting-msg h2 { font-size: 1.5em; margin-bottom: 10px; }
+        .waiting-msg p { color: #aaa; }
+        .waiting-msg .emoji { font-size: 3em; margin-bottom: 20px; }
+
+        .result-msg {
+            text-align: center;
+            display: none;
+        }
+        .result-msg .emoji { font-size: 4em; margin-bottom: 15px; }
+        .result-msg h2 { font-size: 1.5em; margin-bottom: 10px; }
+        .result-msg .correct-answer { color: #43e97b; font-size: 1.2em; margin: 10px 0; }
+        .result-msg .your-answer { color: #aaa; margin: 5px 0; }
+        .result-msg .points-earned { font-size: 1.3em; color: #ffd700; margin: 15px 0; }
+
+        .finished-msg {
+            text-align: center;
+            display: none;
+        }
+        .finished-msg .emoji { font-size: 4em; margin-bottom: 15px; }
+        .finished-msg h2 { font-size: 1.8em; margin-bottom: 20px; }
+        .ranking { text-align: left; width: 100%; }
+        .rank-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 20px;
+            margin-bottom: 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            font-size: 1.1em;
+        }
+        .rank-item:first-child {
+            background: linear-gradient(135deg, #ffd700, #ff8c00);
+            color: #000;
+            font-weight: bold;
+            font-size: 1.3em;
+        }
+        .answered-msg {
+            text-align: center;
+            display: none;
+        }
+        .answered-msg .emoji { font-size: 3em; margin-bottom: 15px; }
+        .answered-msg h2 { margin-bottom: 10px; }
+        .answered-msg p { color: #aaa; }
+    </style>
+</head>
+<body>
+    <div class="header">🎯 社内クイズ大会</div>
+    <div class="container">
+        <div class="team-select" id="teamSelect">
+            <h2>チームを選んでください</h2>
+            <div class="team-buttons" id="teamButtons"></div>
+            <p style="margin-top:15px;color:#aaa;font-size:0.85em;">管理者がチームを登録するのをお待ちください</p>
+        </div>
+
+        <div class="waiting-msg" id="waitingMsg">
+            <div class="emoji">⏳</div>
+            <h2>次の問題をお待ちください</h2>
+            <p>管理者が問題を出題します</p>
+            <div class="team-badge" id="waitingTeamBadge"></div>
+        </div>
+
+        <div class="question-area" id="questionArea">
+            <div class="team-badge" id="teamBadge"></div>
+            <div class="q-number" id="qNumber"></div>
+            <div class="q-text" id="qText"></div>
+            <div class="q-points" id="qPoints"></div>
+            <div class="choices" id="choices"></div>
+        </div>
+
+        <div class="answered-msg" id="answeredMsg">
+            <div class="emoji">✅</div>
+            <h2>回答済み！</h2>
+            <p>結果発表をお待ちください</p>
+        </div>
+
+        <div class="result-msg" id="resultMsg">
+            <div class="emoji" id="resultEmoji"></div>
+            <h2 id="resultTitle"></h2>
+            <div class="correct-answer" id="correctAnswer"></div>
+            <div class="your-answer" id="yourAnswer"></div>
+            <div class="points-earned" id="pointsEarned"></div>
+        </div>
+
+        <div class="finished-msg" id="finishedMsg">
+            <div class="emoji">🏆</div>
+            <h2>クイズ終了！</h2>
+            <div class="ranking" id="ranking"></div>
+        </div>
+    </div>
+
+    <script>
+        let ws;
+        let myTeam = null;
+        let currentState = null;
+
+        function connect() {
+            const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${location.host}/ws/player`);
+            ws.onmessage = (e) => {
+                const msg = JSON.parse(e.data);
+                if (msg.type === 'state') {
+                    currentState = msg.data;
+                    render(msg.data);
+                } else if (msg.type === 'judge_result') {
+                    showResult(msg.data);
+                }
+            };
+            ws.onclose = () => setTimeout(connect, 2000);
+        }
+
+        function hideAll() {
+            document.getElementById('teamSelect').style.display = 'none';
+            document.getElementById('waitingMsg').style.display = 'none';
+            document.getElementById('questionArea').style.display = 'none';
+            document.getElementById('answeredMsg').style.display = 'none';
+            document.getElementById('resultMsg').style.display = 'none';
+            document.getElementById('finishedMsg').style.display = 'none';
+        }
+
+        function render(state) {
+            if (!myTeam) {
+                hideAll();
+                document.getElementById('teamSelect').style.display = 'block';
+                const btns = document.getElementById('teamButtons');
+                btns.innerHTML = '';
+                Object.keys(state.teams).forEach(team => {
+                    const btn = document.createElement('button');
+                    btn.className = 'team-btn';
+                    btn.textContent = team;
+                    btn.onclick = () => { myTeam = team; render(state); };
+                    btns.appendChild(btn);
+                });
+                return;
+            }
+
+            if (!(myTeam in state.teams)) {
+                myTeam = null;
+                render(state);
+                return;
+            }
+
+            if (state.phase === 'waiting') {
+                hideAll();
+                document.getElementById('waitingMsg').style.display = 'block';
+                document.getElementById('waitingTeamBadge').textContent = '👥 ' + myTeam;
+            } else if (state.phase === 'question') {
+                if (state.answers_received.includes(myTeam)) {
+                    hideAll();
+                    document.getElementById('answeredMsg').style.display = 'block';
+                } else {
+                    hideAll();
+                    document.getElementById('questionArea').style.display = 'block';
+                    const q = state.current_question;
+                    document.getElementById('teamBadge').textContent = '👥 ' + myTeam;
+                    document.getElementById('qNumber').textContent = `第${q.number}問 / 全${q.total}問`;
+                    document.getElementById('qText').textContent = q.question;
+                    document.getElementById('qPoints').textContent = `⭐ ${q.points}ポイント`;
+                    const choicesDiv = document.getElementById('choices');
+                    choicesDiv.innerHTML = '';
+                    q.choices.forEach(c => {
+                        const btn = document.createElement('button');
+                        btn.className = 'choice-btn';
+                        btn.textContent = c;
+                        btn.onclick = () => {
+                            ws.send(JSON.stringify({type: 'answer', team: myTeam, answer: c}));
+                            document.querySelectorAll('.choice-btn').forEach(b => {
+                                b.disabled = true;
+                                b.classList.remove('selected');
+                            });
+                            btn.classList.add('selected');
+                            setTimeout(() => {
+                                hideAll();
+                                document.getElementById('answeredMsg').style.display = 'block';
+                            }, 500);
+                        };
+                        choicesDiv.appendChild(btn);
+                    });
+                }
+            } else if (state.phase === 'result') {
+                // resultはjudge_resultで表示するのでここではスキップ
+            } else if (state.phase === 'finished') {
+                showFinished(state);
+            }
+        }
+
+        function showResult(data) {
+            hideAll();
+            document.getElementById('resultMsg').style.display = 'block';
+            const myResult = data.results[myTeam];
+            if (!myResult) return;
+
+            if (myResult.correct) {
+                document.getElementById('resultEmoji').textContent = '🎉';
+                document.getElementById('resultTitle').textContent = '正解！';
+                document.getElementById('pointsEarned').textContent = `+${myResult.points} ポイント！`;
+            } else {
+                document.getElementById('resultEmoji').textContent = '😢';
+                document.getElementById('resultTitle').textContent = '不正解...';
+                document.getElementById('pointsEarned').textContent = '+0 ポイント';
+            }
+            document.getElementById('correctAnswer').textContent = `正解: ${data.correct_answer}`;
+            document.getElementById('yourAnswer').textContent = `あなたの回答: ${myResult.answer}`;
+        }
+
+        function showFinished(state) {
+            hideAll();
+            document.getElementById('finishedMsg').style.display = 'block';
+            const sorted = Object.entries(state.teams).sort((a, b) => b[1] - a[1]);
+            const ranking = document.getElementById('ranking');
+            ranking.innerHTML = '';
+            sorted.forEach(([team, score], i) => {
+                const div = document.createElement('div');
+                div.className = 'rank-item';
+                const medals = ['🥇', '🥈', '🥉'];
+                const medal = medals[i] || `${i + 1}位`;
+                div.innerHTML = `<span>${medal} ${team}</span><span>${score}pt</span>`;
+                ranking.appendChild(div);
+            });
+        }
+
+        connect();
+    </script>
+</body>
+</html>

@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>クイズ大会 - 管理者</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', 'Hiragino Sans', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            padding: 15px;
+            margin-bottom: 20px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+        }
+        .header h1 { font-size: 1.5em; }
+        .header .phase-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            margin-top: 8px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+        .phase-waiting { background: #f39c12; color: #000; }
+        .phase-question { background: #2ecc71; color: #000; }
+        .phase-result { background: #3498db; }
+        .phase-finished { background: #e74c3c; }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+        }
+        .card h3 {
+            margin-bottom: 15px;
+            font-size: 1.1em;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+        .team-input {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        .team-input input {
+            flex: 1;
+            padding: 10px;
+            border-radius: 8px;
+            border: none;
+            font-size: 1em;
+            background: rgba(255,255,255,0.2);
+            color: #fff;
+        }
+        .team-input input::placeholder { color: rgba(255,255,255,0.5); }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        .btn:hover { transform: scale(1.05); filter: brightness(1.1); }
+        .btn-add { background: #2ecc71; color: #fff; }
+        .btn-next { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; padding: 15px 30px; font-size: 1.2em; width: 100%; }
+        .btn-judge { background: linear-gradient(135deg, #f093fb, #f5576c); color: #fff; padding: 15px 30px; font-size: 1.2em; width: 100%; }
+        .btn-reset { background: #e74c3c; color: #fff; margin-top: 10px; width: 100%; }
+
+        .team-list { list-style: none; }
+        .team-list li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            margin-bottom: 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+        }
+        .team-list .remove-btn {
+            background: rgba(231,76,60,0.8);
+            border: none;
+            color: #fff;
+            padding: 5px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .score-board {
+            list-style: none;
+        }
+        .score-board li {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            margin-bottom: 5px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+        }
+        .current-q {
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+        .current-q .q-label { color: #aaa; font-size: 0.85em; }
+        .current-q .q-text { font-size: 1.2em; margin: 8px 0; font-weight: bold; }
+        .current-q .q-answer { color: #2ecc71; }
+        .answers-status {
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+        }
+        .answers-status .answered { color: #2ecc71; }
+        .answers-status .not-answered { color: #e74c3c; }
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .full-width { grid-column: 1 / -1; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎮 クイズ大会 管理パネル</h1>
+        <div class="phase-badge" id="phaseBadge">待機中</div>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <h3>👥 チーム管理</h3>
+            <div class="team-input">
+                <input type="text" id="teamNameInput" placeholder="チーム名を入力">
+                <button class="btn btn-add" onclick="addTeam()">追加</button>
+            </div>
+            <ul class="team-list" id="teamList"></ul>
+        </div>
+
+        <div class="card">
+            <h3>📊 スコアボード</h3>
+            <ul class="score-board" id="scoreBoard"></ul>
+        </div>
+
+        <div class="card full-width">
+            <h3>📝 現在の問題</h3>
+            <div class="current-q" id="currentQ">
+                <p style="color:#aaa;">まだ問題が出題されていません</p>
+            </div>
+            <div class="answers-status" id="answersStatus"></div>
+        </div>
+
+        <div class="card full-width">
+            <h3>🎮 コントロール</h3>
+            <div class="controls">
+                <button class="btn btn-next" id="btnNext" onclick="nextQuestion()">▶ 次の問題を出題</button>
+                <button class="btn btn-judge" id="btnJudge" onclick="judge()" style="display:none;">⚖ 結果を発表</button>
+                <button class="btn btn-reset" onclick="resetGame()">🔄 ゲームをリセット</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws;
+        let currentState = null;
+
+        function connect() {
+            const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${location.host}/ws/admin`);
+            ws.onmessage = (e) => {
+                const msg = JSON.parse(e.data);
+                if (msg.type === 'state') {
+                    currentState = msg.data;
+                    render(msg.data);
+                }
+            };
+            ws.onclose = () => setTimeout(connect, 2000);
+        }
+
+        function render(state) {
+            // フェーズ
+            const badge = document.getElementById('phaseBadge');
+            const phases = { waiting: ['⏳ 待機中', 'phase-waiting'], question: ['❓ 出題中', 'phase-question'], result: ['📊 結果発表', 'phase-result'], finished: ['🏆 終了', 'phase-finished'] };
+            const [text, cls] = phases[state.phase] || ['不明', ''];
+            badge.textContent = text;
+            badge.className = 'phase-badge ' + cls;
+
+            // チームリスト
+            const teamList = document.getElementById('teamList');
+            teamList.innerHTML = '';
+            Object.keys(state.teams).forEach(team => {
+                const li = document.createElement('li');
+                li.innerHTML = `<span>${team}</span><button class="remove-btn" onclick="removeTeam('${team}')">✕</button>`;
+                teamList.appendChild(li);
+            });
+
+            // スコアボード
+            const scoreBoard = document.getElementById('scoreBoard');
+            const sorted = Object.entries(state.teams).sort((a, b) => b[1] - a[1]);
+            scoreBoard.innerHTML = '';
+            sorted.forEach(([team, score]) => {
+                const li = document.createElement('li');
+                li.innerHTML = `<span>${team}</span><span style="color:#ffd700;font-weight:bold;">${score} pt</span>`;
+                scoreBoard.appendChild(li);
+            });
+
+            // 現在の問題
+            const currentQ = document.getElementById('currentQ');
+            if (state.current_question) {
+                const q = state.current_question;
+                currentQ.innerHTML = `
+                    <div class="q-label">第${q.number}問 / 全${q.total}問 (${q.points}pt)</div>
+                    <div class="q-text">${q.question}</div>
+                    <div class="q-answer">正解: ${q.choices.join(' / ')}</div>
+                `;
+            } else if (state.phase === 'finished') {
+                currentQ.innerHTML = '<p style="color:#ffd700;font-size:1.2em;">🏆 全問題終了！</p>';
+            } else {
+                currentQ.innerHTML = '<p style="color:#aaa;">まだ問題が出題されていません</p>';
+            }
+
+            // 回答状況
+            const answersStatus = document.getElementById('answersStatus');
+            if (state.phase === 'question') {
+                let html = '<strong>回答状況:</strong><br>';
+                Object.keys(state.teams).forEach(team => {
+                    const answered = state.answers_received.includes(team);
+                    html += `<span class="${answered ? 'answered' : 'not-answered'}">${answered ? '✅' : '⏳'} ${team}</span>&nbsp;&nbsp;`;
+                });
+                answersStatus.innerHTML = html;
+            } else {
+                answersStatus.innerHTML = '';
+            }
+
+            // ボタン
+            const btnNext = document.getElementById('btnNext');
+            const btnJudge = document.getElementById('btnJudge');
+            if (state.phase === 'question') {
+                btnNext.style.display = 'none';
+                btnJudge.style.display = 'block';
+            } else if (state.phase === 'finished') {
+                btnNext.style.display = 'none';
+                btnJudge.style.display = 'none';
+            } else {
+                btnNext.style.display = 'block';
+                btnJudge.style.display = 'none';
+            }
+        }
+
+        function addTeam() {
+            const input = document.getElementById('teamNameInput');
+            const name = input.value.trim();
+            if (!name) return;
+            ws.send(JSON.stringify({ type: 'add_team', team: name }));
+            input.value = '';
+        }
+
+        function removeTeam(name) {
+            if (confirm(`「${name}」を削除しますか？`)) {
+                ws.send(JSON.stringify({ type: 'remove_team', team: name }));
+            }
+        }
+
+        function nextQuestion() {
+            ws.send(JSON.stringify({ type: 'next_question' }));
+        }
+
+        function judge() {
+            ws.send(JSON.stringify({ type: 'judge' }));
+        }
+
+        function resetGame() {
+            if (confirm('ゲームをリセットしますか？')) {
+                ws.send(JSON.stringify({ type: 'reset' }));
+            }
+        }
+
+        document.getElementById('teamNameInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addTeam();
+        });
+
+        connect();
+    </script>
+</body>
+</html>

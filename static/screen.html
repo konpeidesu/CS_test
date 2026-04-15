@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>クイズ大会 - スクリーン</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', 'Hiragino Sans', sans-serif;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 40px;
+            background: rgba(0,0,0,0.3);
+        }
+        .header h1 { font-size: 2em; }
+        .header .q-counter {
+            font-size: 1.2em;
+            color: #aaa;
+        }
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+        }
+        .score-bar {
+            display: flex;
+            gap: 20px;
+            padding: 15px 40px;
+            background: rgba(0,0,0,0.3);
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .score-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 20px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 25px;
+            font-size: 1.1em;
+        }
+        .score-item .score { color: #ffd700; font-weight: bold; }
+        .score-item .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        /* 待機画面 */
+        .waiting-screen { text-align: center; display: none; }
+        .waiting-screen .emoji { font-size: 5em; margin-bottom: 20px; animation: bounce 2s infinite; }
+        .waiting-screen h2 { font-size: 2.5em; margin-bottom: 15px; }
+        .waiting-screen p { font-size: 1.3em; color: #aaa; }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-15px); }
+        }
+
+        /* 問題画面 */
+        .question-screen { text-align: center; display: none; width: 100%; max-width: 900px; }
+        .question-screen .q-number { font-size: 1.3em; color: #aaa; margin-bottom: 15px; }
+        .question-screen .q-text {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            line-height: 1.4;
+        }
+        .question-screen .q-points { font-size: 1.2em; color: #ffd700; margin-bottom: 40px; }
+        .screen-choices {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            width: 100%;
+        }
+        .screen-choice {
+            padding: 25px;
+            font-size: 1.5em;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 15px;
+            background: rgba(255,255,255,0.08);
+            text-align: center;
+            transition: all 0.5s;
+        }
+        .screen-choice.correct {
+            background: linear-gradient(135deg, #2ecc71, #27ae60);
+            border-color: #2ecc71;
+            transform: scale(1.05);
+        }
+        .screen-choice.wrong {
+            opacity: 0.3;
+        }
+        .answer-status {
+            margin-top: 30px;
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .answer-chip {
+            padding: 8px 18px;
+            border-radius: 20px;
+            font-size: 1em;
+        }
+        .answer-chip.done { background: rgba(46,204,113,0.3); border: 1px solid #2ecc71; }
+        .answer-chip.pending { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); }
+
+        /* 結果画面 */
+        .result-screen { text-align: center; display: none; width: 100%; max-width: 800px; }
+        .result-screen .correct-label { font-size: 1.3em; color: #aaa; margin-bottom: 10px; }
+        .result-screen .correct-answer { font-size: 2.5em; color: #2ecc71; font-weight: bold; margin-bottom: 30px; }
+        .result-teams {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .result-team {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 25px;
+            border-radius: 12px;
+            font-size: 1.3em;
+            transition: all 0.5s;
+        }
+        .result-team.correct-team {
+            background: linear-gradient(135deg, rgba(46,204,113,0.3), rgba(39,174,96,0.3));
+            border: 2px solid #2ecc71;
+        }
+        .result-team.wrong-team {
+            background: rgba(255,255,255,0.05);
+            border: 2px solid rgba(255,255,255,0.1);
+        }
+        .result-team .team-answer { font-size: 0.9em; color: #aaa; }
+        .result-team .team-points { font-weight: bold; }
+        .result-team .team-points.got-points { color: #ffd700; }
+
+        /* 終了画面 */
+        .finished-screen { text-align: center; display: none; width: 100%; max-width: 800px; }
+        .finished-screen h2 { font-size: 3em; margin-bottom: 30px; }
+        .finished-screen .emoji { font-size: 5em; margin-bottom: 20px; animation: bounce 2s infinite; }
+        .podium {
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .podium-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            border-radius: 15px;
+            min-width: 150px;
+        }
+        .podium-item .medal { font-size: 3em; }
+        .podium-item .team-name { font-size: 1.3em; font-weight: bold; margin: 10px 0; }
+        .podium-item .team-score { font-size: 1.5em; color: #ffd700; font-weight: bold; }
+        .podium-1st {
+            background: linear-gradient(135deg, rgba(255,215,0,0.3), rgba(255,140,0,0.3));
+            border: 2px solid #ffd700;
+            min-height: 200px;
+        }
+        .podium-2nd {
+            background: linear-gradient(135deg, rgba(192,192,192,0.2), rgba(169,169,169,0.2));
+            border: 2px solid #c0c0c0;
+            min-height: 160px;
+        }
+        .podium-3rd {
+            background: linear-gradient(135deg, rgba(205,127,50,0.2), rgba(184,115,51,0.2));
+            border: 2px solid #cd7f32;
+            min-height: 130px;
+        }
+        .confetti { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 999; }
+
+        .team-colors { }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎯 社内クイズ大会</h1>
+        <div class="q-counter" id="qCounter"></div>
+    </div>
+
+    <div class="main">
+        <div class="waiting-screen" id="waitingScreen">
+            <div class="emoji">🎮</div>
+            <h2>クイズ大会</h2>
+            <p>まもなく開始します...</p>
+        </div>
+
+        <div class="question-screen" id="questionScreen">
+            <div class="q-number" id="screenQNumber"></div>
+            <div class="q-text" id="screenQText"></div>
+            <div class="q-points" id="screenQPoints"></div>
+            <div class="screen-choices" id="screenChoices"></div>
+            <div class="answer-status" id="answerStatus"></div>
+        </div>
+
+        <div class="result-screen" id="resultScreen">
+            <div class="correct-label">正解</div>
+            <div class="correct-answer" id="screenCorrectAnswer"></div>
+            <div class="result-teams" id="resultTeams"></div>
+        </div>
+
+        <div class="finished-screen" id="finishedScreen">
+            <div class="emoji">🏆</div>
+            <h2>最終結果</h2>
+            <div class="podium" id="podium"></div>
+        </div>
+    </div>
+
+    <div class="score-bar" id="scoreBar"></div>
+
+    <canvas class="confetti" id="confetti"></canvas>
+
+    <script>
+        const teamColors = ['#f5576c','#4facfe','#43e97b','#fee140','#a18cd1','#fccb90','#fa709a','#38f9d7','#667eea','#f093fb'];
+        let ws;
+        let teamColorMap = {};
+
+        function connect() {
+            const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${location.host}/ws/player`);
+            ws.onmessage = (e) => {
+                const msg = JSON.parse(e.data);
+                if (msg.type === 'state') render(msg.data);
+                else if (msg.type === 'judge_result') showResult(msg.data);
+            };
+            ws.onclose = () => setTimeout(connect, 2000);
+        }
+
+        function getTeamColor(team) {
+            if (!teamColorMap[team]) {
+                teamColorMap[team] = teamColors[Object.keys(teamColorMap).length % teamColors.length];
+            }
+            return teamColorMap[team];
+        }
+
+        function hideAll() {
+            ['waitingScreen','questionScreen','resultScreen','finishedScreen'].forEach(id => {
+                document.getElementById(id).style.display = 'none';
+            });
+        }
+
+        function renderScoreBar(teams) {
+            const bar = document.getElementById('scoreBar');
+            const sorted = Object.entries(teams).sort((a, b) => b[1] - a[1]);
+            bar.innerHTML = '';
+            sorted.forEach(([team, score]) => {
+                const color = getTeamColor(team);
+                const div = document.createElement('div');
+                div.className = 'score-item';
+                div.innerHTML = `<span class="dot" style="background:${color}"></span><span>${team}</span><span class="score">${score}pt</span>`;
+                bar.appendChild(div);
+            });
+        }
+
+        function render(state) {
+            renderScoreBar(state.teams);
+
+            if (state.phase === 'waiting') {
+                hideAll();
+                document.getElementById('waitingScreen').style.display = 'block';
+                document.getElementById('qCounter').textContent = '';
+            } else if (state.phase === 'question') {
+                hideAll();
+                document.getElementById('questionScreen').style.display = 'block';
+                const q = state.current_question;
+                document.getElementById('qCounter').textContent = `${q.number} / ${q.total}`;
+                document.getElementById('screenQNumber').textContent = `第${q.number}問`;
+                document.getElementById('screenQText').textContent = q.question;
+                document.getElementById('screenQPoints').textContent = `⭐ ${q.points} ポイント`;
+
+                const choicesDiv = document.getElementById('screenChoices');
+                choicesDiv.innerHTML = '';
+                q.choices.forEach(c => {
+                    const div = document.createElement('div');
+                    div.className = 'screen-choice';
+                    div.textContent = c;
+                    div.dataset.choice = c;
+                    choicesDiv.appendChild(div);
+                });
+
+                // 回答状況
+                const statusDiv = document.getElementById('answerStatus');
+                statusDiv.innerHTML = '';
+                Object.keys(state.teams).forEach(team => {
+                    const answered = state.answers_received.includes(team);
+                    const chip = document.createElement('span');
+                    chip.className = `answer-chip ${answered ? 'done' : 'pending'}`;
+                    chip.textContent = `${answered ? '✅' : '⏳'} ${team}`;
+                    statusDiv.appendChild(chip);
+                });
+            } else if (state.phase === 'finished') {
+                showFinished(state);
+            }
+        }
+
+        function showResult(data) {
+            hideAll();
+            document.getElementById('resultScreen').style.display = 'block';
+            document.getElementById('screenCorrectAnswer').textContent = data.correct_answer;
+
+            // 選択肢のハイライト（前の画面が残っていれば）
+            document.querySelectorAll('.screen-choice').forEach(el => {
+                if (el.dataset.choice === data.correct_answer) el.classList.add('correct');
+                else el.classList.add('wrong');
+            });
+
+            const teamsDiv = document.getElementById('resultTeams');
+            teamsDiv.innerHTML = '';
+            const sorted = Object.entries(data.results).sort((a, b) => (b[1].correct ? 1 : 0) - (a[1].correct ? 1 : 0));
+            sorted.forEach(([team, result]) => {
+                const div = document.createElement('div');
+                div.className = `result-team ${result.correct ? 'correct-team' : 'wrong-team'}`;
+                div.innerHTML = `
+                    <span>${result.correct ? '⭕' : '❌'} ${team}</span>
+                    <span class="team-answer">${result.answer}</span>
+                    <span class="team-points ${result.correct ? 'got-points' : ''}">${result.correct ? '+' + result.points + 'pt' : '0pt'}</span>
+                `;
+                teamsDiv.appendChild(div);
+            });
+
+            renderScoreBar(data.scores);
+        }
+
+        function showFinished(state) {
+            hideAll();
+            document.getElementById('finishedScreen').style.display = 'block';
+            document.getElementById('qCounter').textContent = '終了';
+
+            const sorted = Object.entries(state.teams).sort((a, b) => b[1] - a[1]);
+            const podium = document.getElementById('podium');
+            podium.innerHTML = '';
+            const medals = ['🥇', '🥈', '🥉'];
+            const classes = ['podium-1st', 'podium-2nd', 'podium-3rd'];
+
+            // 表彰台の順番: 2位, 1位, 3位
+            const order = [1, 0, 2];
+            order.forEach(i => {
+                if (sorted[i]) {
+                    const [team, score] = sorted[i];
+                    const div = document.createElement('div');
+                    div.className = `podium-item ${classes[i]}`;
+                    div.innerHTML = `
+                        <div class="medal">${medals[i]}</div>
+                        <div class="team-name">${team}</div>
+                        <div class="team-score">${score} pt</div>
+                    `;
+                    podium.appendChild(div);
+                }
+            });
+
+            // 紙吹雪
+            launchConfetti();
+        }
+
+        function launchConfetti() {
+            const canvas = document.getElementById('confetti');
+            const ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            const pieces = [];
+            const colors = ['#ffd700','#ff6b6b','#4ecdc4','#45b7d1','#f093fb','#43e97b','#fee140'];
+
+            for (let i = 0; i < 150; i++) {
+                pieces.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height - canvas.height,
+                    w: Math.random() * 10 + 5,
+                    h: Math.random() * 6 + 3,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    vy: Math.random() * 3 + 2,
+                    vx: Math.random() * 2 - 1,
+                    rot: Math.random() * 360,
+                    rv: Math.random() * 5 - 2.5,
+                });
+            }
+
+            let frame = 0;
+            function animate() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                pieces.forEach(p => {
+                    p.y += p.vy;
+                    p.x += p.vx;
+                    p.rot += p.rv;
+                    ctx.save();
+                    ctx.translate(p.x, p.y);
+                    ctx.rotate(p.rot * Math.PI / 180);
+                    ctx.fillStyle = p.color;
+                    ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+                    ctx.restore();
+                });
+                frame++;
+                if (frame < 300) requestAnimationFrame(animate);
+                else ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+            animate();
+        }
+
+        connect();
+    </script>
+</body>
+</html>
