@@ -126,7 +126,7 @@ renderScoreBar();
 const area=document.getElementById('qListArea');area.innerHTML='';
 const groups=[{pts:2,label:'⭐⭐ 2点問題（基本）',cls:'section-2pt'},{pts:3,label:'⭐⭐⭐ 3点問題（応用）',cls:'section-3pt'},{pts:4,label:'⭐⭐⭐⭐ 4点問題（難問）',cls:'section-4pt'}];
 groups.forEach(g=>{const qs=gameState.questions.filter(q=>q.points===g.pts);if(!qs.length)return;
-area.innerHTML+=`<div class="section-header ${g.cls}">${g.label}</div>`;
+const sh=document.createElement('div');sh.className='section-header '+g.cls;sh.textContent=g.label;area.appendChild(sh);
 const gridDiv=document.createElement('div');gridDiv.className='q-grid';
 qs.forEach(q=>{const card=document.createElement('div');card.className='q-card pts-'+q.points+(q.solved?' solved':'');
 let st='未回答',sc='status-unsolved';
