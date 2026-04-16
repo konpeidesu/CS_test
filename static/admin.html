@@ -10,6 +10,10 @@ body{font-family:'Segoe UI','Hiragino Sans',sans-serif;background:linear-gradien
 .header h1{font-size:1.5em}
 .status-badge{display:inline-block;padding:5px 15px;border-radius:20px;margin-top:8px;font-size:.85em;font-weight:bold}
 .status-on{background:#2ecc71;color:#000}.status-off{background:#e74c3c}
+.timer-display{font-size:2.5em;font-weight:bold;margin-top:10px;font-variant-numeric:tabular-nums}
+.timer-display.warning{color:#e67e22;animation:pulse 1s infinite}
+.timer-display.danger{color:#e74c3c;animation:pulse .5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:1100px;margin:0 auto}
 .card{background:rgba(255,255,255,.1);border-radius:15px;padding:20px}
 .card h3{margin-bottom:15px;font-size:1.1em;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.2)}
@@ -23,7 +27,7 @@ body{font-family:'Segoe UI','Hiragino Sans',sans-serif;background:linear-gradien
 .score-table th,.score-table td{padding:10px;text-align:left;border-bottom:1px solid rgba(255,255,255,.1)}
 .score-table th{color:#aaa;font-size:.85em}
 .score-val{color:#ffd700;font-weight:bold;font-size:1.1em}
-.progress-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;font-size:.7em;text-align:center}
+.progress-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;font-size:.7em;text-align:center}
 .progress-grid .ph{color:#aaa;font-weight:bold;padding:4px}
 .progress-grid .pc{padding:3px;border-radius:4px}
 .pc-solved{background:rgba(46,204,113,.3);color:#2ecc71}
@@ -35,7 +39,7 @@ body{font-family:'Segoe UI','Hiragino Sans',sans-serif;background:linear-gradien
 </style>
 </head>
 <body>
-<div class="header"><h1>🎮 クイズ大会 管理パネル</h1><div class="status-badge" id="statusBadge">⏳ 待機中</div></div>
+<div class="header"><h1>🎮 クイズ大会 管理パネル</h1><div class="status-badge" id="statusBadge">⏳ 待機中</div><div class="timer-display" id="timerDisplay" style="display:none">20:00</div></div>
 <div class="grid">
 <div class="card"><h3>📊 スコアボード</h3><table class="score-table" id="scoreTable"><thead><tr><th>チーム</th><th>スコア</th><th>正解数</th></tr></thead><tbody></tbody></table></div>
 <div class="card"><h3>🎮 コントロール</h3><button class="btn btn-start" id="btnStart" onclick="startGame()">▶ ゲーム開始</button><button class="btn btn-stop" id="btnStop" onclick="stopGame()" style="display:none">⏸ ゲーム停止</button><button class="btn btn-reset" onclick="resetGame()">🔄 リセット</button></div>
@@ -43,15 +47,22 @@ body{font-family:'Segoe UI','Hiragino Sans',sans-serif;background:linear-gradien
 <div class="card full"><h3>📝 イベントログ</h3><div class="event-log" id="eventLog"></div></div>
 </div>
 <script>
-let ws,state=null;
+let ws,state=null,timerInterval=null;
 function connect(){const p=location.protocol==='https:'?'wss:':'ws:';ws=new WebSocket(`${p}//${location.host}/ws/admin`);ws.onmessage=e=>{const msg=JSON.parse(e.data);
 if(msg.type==='admin_state'){state=msg.data;render();}
 else if(msg.type==='scores_update'&&state){state.teams=msg.data;renderScores();}
 else if(msg.type==='event'&&msg.data){logEvent(msg.data);}};ws.onclose=()=>setTimeout(connect,2000);}
 function render(){if(!state)return;renderScores();renderProgress();
-const badge=document.getElementById('statusBadge');const btnStart=document.getElementById('btnStart');const btnStop=document.getElementById('btnStop');
-if(state.game_started){badge.textContent='🟢 ゲーム中';badge.className='status-badge status-on';btnStart.style.display='none';btnStop.style.display='block';}
-else{badge.textContent='⏳ 待機中';badge.className='status-badge status-off';btnStart.style.display='block';btnStop.style.display='none';}}
+const badge=document.getElementById('statusBadge');const btnStart=document.getElementById('btnStart');const btnStop=document.getElementById('btnStop');const timerEl=document.getElementById('timerDisplay');
+if(state.game_started){badge.textContent='🟢 ゲーム中';badge.className='status-badge status-on';btnStart.style.display='none';btnStop.style.display='block';timerEl.style.display='block';startTimer(state.remaining_seconds);}
+else{badge.textContent='⏳ 待機中';badge.className='status-badge status-off';btnStart.style.display='block';btnStop.style.display='none';timerEl.style.display='none';stopTimer();}}
+function startTimer(remaining){stopTimer();if(remaining==null)return;
+let rem=remaining;updateTimerDisplay(rem);
+timerInterval=setInterval(()=>{rem-=1;if(rem<0)rem=0;updateTimerDisplay(rem);if(rem<=0){stopTimer();logEvent({message:'⏰ 制限時間終了！'});}},1000);}
+function stopTimer(){if(timerInterval){clearInterval(timerInterval);timerInterval=null;}}
+function updateTimerDisplay(sec){const el=document.getElementById('timerDisplay');const m=Math.floor(sec/60);const s=Math.floor(sec%60);
+el.textContent=`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+el.className='timer-display';if(sec<=60)el.classList.add('danger');else if(sec<=300)el.classList.add('warning');}
 function renderScores(){if(!state)return;const tbody=document.querySelector('#scoreTable tbody');const sorted=Object.entries(state.teams).sort((a,b)=>b[1]-a[1]);
 tbody.innerHTML='';sorted.forEach(([team,score])=>{const solved=Object.values(state.team_status[team]||{}).filter(s=>s.solved).length;
 tbody.innerHTML+=`<tr><td>${team}</td><td class="score-val">${score.toFixed(1)}</td><td>${solved}/30</td></tr>`;});}

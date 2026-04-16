@@ -56,6 +56,8 @@ class QuizGame:
         self.connections: List[WebSocket] = []
         self.admin_connections: List[WebSocket] = []
         self.game_started: bool = False
+        self.game_start_time: Optional[float] = None
+        self.time_limit: int = 1200  # 20 minutes
 
     def submit_answer(self, team, question_id, answer):
         if team not in self.teams:
@@ -123,7 +125,11 @@ class QuizGame:
         return {"id": q["id"], "title": q["title"], "question": q["question"], "points": q["points"], "has_hint": bool(q.get("hint")), "solved": st.get("solved", False), "hint_used": st.get("hint_used", False), "wrong_count": st.get("wrong_count", 0)}
 
     def get_admin_state(self):
-        return {"teams": {t: self.teams[t] for t in TEAMS}, "team_status": {t: {str(qid): s for qid, s in statuses.items()} for t, statuses in self.team_status.items()}, "first_solver": {str(k): v for k, v in self.first_solver.items()}, "random_penalty": {str(k): v for k, v in self.random_penalty.items()}, "questions": self.questions, "game_started": self.game_started}
+        remaining = None
+        if self.game_started and self.game_start_time:
+            elapsed = time.time() - self.game_start_time
+            remaining = max(0, self.time_limit - elapsed)
+        return {"teams": {t: self.teams[t] for t in TEAMS}, "team_status": {t: {str(qid): s for qid, s in statuses.items()} for t, statuses in self.team_status.items()}, "first_solver": {str(k): v for k, v in self.first_solver.items()}, "random_penalty": {str(k): v for k, v in self.random_penalty.items()}, "questions": self.questions, "game_started": self.game_started, "remaining_seconds": remaining}
 
     def reset(self):
         conns = self.connections
@@ -208,6 +214,7 @@ async def admin_ws(websocket: WebSocket):
             msg = json.loads(data)
             if msg["type"] == "start_game":
                 game.game_started = True
+                game.game_start_time = time.time()
                 await broadcast_event({"message": "ゲームが開始されました！"})
                 await broadcast_admin()
                 for ws in game.connections:

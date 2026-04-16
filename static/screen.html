@@ -5,65 +5,94 @@
 <title>クイズ大会 - スクリーン</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Segoe UI','Hiragino Sans',sans-serif;background:linear-gradient(135deg,#0f0c29,#302b63,#24243e);color:#fff;min-height:100vh;display:flex;flex-direction:column}
+body{font-family:'Segoe UI','Hiragino Sans',sans-serif;background:linear-gradient(135deg,#0f0c29,#302b63,#24243e);color:#fff;min-height:100vh;display:flex;flex-direction:column;overflow:hidden}
 .header{display:flex;justify-content:space-between;align-items:center;padding:20px 40px;background:rgba(0,0,0,.3)}
 .header h1{font-size:2em}
+.header .timer{font-size:1.8em;font-weight:bold;font-variant-numeric:tabular-nums;color:#ffd700}
+.header .timer.warning{color:#e67e22}.header .timer.danger{color:#e74c3c;animation:pulse .5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
 .main{flex:1;display:flex;align-items:center;justify-content:center;padding:40px}
-.score-bar{display:flex;gap:15px;padding:15px 40px;background:rgba(0,0,0,.3);flex-wrap:wrap;justify-content:center}
-.score-item{display:flex;align-items:center;gap:10px;padding:10px 25px;background:rgba(255,255,255,.1);border-radius:25px;font-size:1.2em;min-width:140px;justify-content:center}
-.score-item .sname{font-weight:bold}.score-item .sval{color:#ffd700;font-weight:bold}
-.score-item .dot{width:14px;height:14px;border-radius:50%}
-.board{width:100%;max-width:1100px}
-.board-title{text-align:center;font-size:2em;margin-bottom:30px;font-weight:bold}
-.board-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}
-.b-card{background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.15);border-radius:12px;padding:15px;text-align:center;transition:all .5s}
-.b-card.all-solved{border-color:#2ecc71;background:rgba(46,204,113,.15)}
-.b-card .b-num{font-size:.85em;color:#aaa}.b-card .b-title{font-size:1.1em;font-weight:bold;margin:5px 0}
-.b-card .b-pts{color:#ffd700;font-size:.9em}.b-card .b-first{color:#ffd700;font-size:.8em;margin-top:5px}
-.b-card .b-solvers{font-size:.75em;color:#2ecc71;margin-top:3px}
-.toast{position:fixed;top:80px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.9);padding:15px 35px;border-radius:12px;z-index:200;display:none;text-align:center;border:2px solid #ffd700;font-size:1.3em;max-width:80%}
+.waiting{text-align:center}.waiting .emoji{font-size:6em;animation:bounce 2s infinite}
+@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-15px)}}
+.waiting h2{font-size:3em;margin:20px 0}.waiting p{color:#aaa;font-size:1.5em}
+.score-main{width:100%;max-width:1200px}
+.score-title{text-align:center;font-size:2.5em;margin-bottom:40px;font-weight:bold}
+.score-cards{display:flex;flex-direction:column;gap:20px}
+.score-row{display:flex;align-items:center;gap:20px;padding:20px 30px;border-radius:20px;background:rgba(255,255,255,.06);transition:all .6s ease;position:relative;overflow:hidden}
+.score-row.rank-1{background:linear-gradient(135deg,rgba(255,215,0,.15),rgba(255,215,0,.05));border:2px solid rgba(255,215,0,.3);transform:scale(1.03)}
+.score-row.rank-2{background:linear-gradient(135deg,rgba(192,192,192,.12),rgba(192,192,192,.04));border:2px solid rgba(192,192,192,.2)}
+.score-row.rank-3{background:linear-gradient(135deg,rgba(205,127,50,.12),rgba(205,127,50,.04));border:2px solid rgba(205,127,50,.2)}
+.score-rank{font-size:2.5em;width:60px;text-align:center}
+.score-dot{width:20px;height:20px;border-radius:50%;flex-shrink:0}
+.score-name{font-size:2em;font-weight:bold;flex:0 0 120px}
+.score-bar-wrap{flex:1;height:40px;background:rgba(255,255,255,.08);border-radius:20px;overflow:hidden;position:relative}
+.score-bar-fill{height:100%;border-radius:20px;transition:width 1s ease;min-width:5px}
+.score-val{font-size:2.2em;font-weight:bold;color:#ffd700;min-width:120px;text-align:right;text-shadow:0 0 15px rgba(255,215,0,.4)}
+.score-solved{font-size:1em;color:#aaa;min-width:60px;text-align:right}
+/* Score change animation */
+.score-delta{position:absolute;right:200px;font-size:1.5em;font-weight:bold;opacity:0;pointer-events:none}
+.score-delta.show-plus{color:#2ecc71;animation:floatUp 2s forwards}
+.score-delta.show-minus{color:#e74c3c;animation:floatUp 2s forwards}
+@keyframes floatUp{0%{opacity:1;transform:translateY(0)}50%{opacity:1}100%{opacity:0;transform:translateY(-60px)}}
+/* Flash effect on score change */
+.score-row.flash-plus{animation:glowGreen .8s}
+.score-row.flash-minus{animation:glowRed .8s}
+@keyframes glowGreen{0%{box-shadow:0 0 0 rgba(46,204,113,0)}30%{box-shadow:0 0 30px rgba(46,204,113,.5)}100%{box-shadow:0 0 0 rgba(46,204,113,0)}}
+@keyframes glowRed{0%{box-shadow:0 0 0 rgba(231,76,60,0)}30%{box-shadow:0 0 30px rgba(231,76,60,.5)}100%{box-shadow:0 0 0 rgba(231,76,60,0)}}
+.toast{position:fixed;top:80px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.9);padding:15px 35px;border-radius:12px;z-index:200;display:none;text-align:center;border:2px solid #ffd700;font-size:1.5em;max-width:80%}
 .toast.show{display:block;animation:fadeInOut 5s}
 @keyframes fadeInOut{0%{opacity:0}10%{opacity:1}80%{opacity:1}100%{opacity:0}}
-.waiting{text-align:center}.waiting .emoji{font-size:5em;animation:bounce 2s infinite}
-@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-15px)}}
-.waiting h2{font-size:2.5em;margin:20px 0}.waiting p{color:#aaa;font-size:1.3em}
 </style>
 </head>
 <body>
-<div class="header"><h1>🎯 社内クイズ大会</h1></div>
+<div class="header"><h1>🎯 社内クイズ大会</h1><div class="timer" id="headerTimer" style="display:none">20:00</div></div>
 <div class="main">
 <div class="waiting" id="waitingScreen"><div class="emoji">🎮</div><h2>クイズ大会</h2><p>まもなく開始します...</p></div>
-<div class="board" id="boardScreen" style="display:none"><div class="board-title">📋 問題ボード</div><div class="board-grid" id="boardGrid"></div></div>
+<div class="score-main" id="scoreScreen" style="display:none"><div class="score-title">🏆 スコアボード</div><div class="score-cards" id="scoreCards"></div></div>
 </div>
-<div class="score-bar" id="scoreBar"></div>
 <div class="toast" id="toast"></div>
 <script>
 const TEAMS=["A-1","A-2","B-1","B-2","C-1","C-2"];
 const teamColors=['#f5576c','#4facfe','#43e97b','#fee140','#a18cd1','#fccb90'];
-let ws,adminState=null;
+const barColors=['linear-gradient(90deg,#f5576c,#f093fb)','linear-gradient(90deg,#4facfe,#00f2fe)','linear-gradient(90deg,#43e97b,#38f9d7)','linear-gradient(90deg,#fa709a,#fee140)','linear-gradient(90deg,#a18cd1,#fbc2eb)','linear-gradient(90deg,#fccb90,#d57eeb)'];
+let ws,adminState=null,prevScores={},timerInterval=null;
 function connect(){const p=location.protocol==='https:'?'wss:':'ws:';ws=new WebSocket(`${p}//${location.host}/ws/admin`);
 ws.onmessage=e=>{const msg=JSON.parse(e.data);
 if(msg.type==='admin_state'){adminState=msg.data;render();}
-else if(msg.type==='scores_update'&&adminState){adminState.teams=msg.data;renderScoreBar();}
+else if(msg.type==='scores_update'&&adminState){const oldScores={...adminState.teams};adminState.teams=msg.data;renderScores(oldScores);}
 else if(msg.type==='event'&&msg.data){const parts=[msg.data.bonus_msg,msg.data.penalty_msg,msg.data.message].filter(Boolean);if(parts.length)showToast(parts.join(' / '));}};
 ws.onclose=()=>setTimeout(connect,2000);}
 function render(){if(!adminState)return;
-if(adminState.game_started){document.getElementById('waitingScreen').style.display='none';document.getElementById('boardScreen').style.display='block';renderBoard();}
-else{document.getElementById('waitingScreen').style.display='block';document.getElementById('boardScreen').style.display='none';}
-renderScoreBar();}
-function renderScoreBar(){if(!adminState)return;const bar=document.getElementById('scoreBar');
-const sorted=Object.entries(adminState.teams).sort((a,b)=>b[1]-a[1]);bar.innerHTML='';
-sorted.forEach(([team,score],i)=>{const ci=TEAMS.indexOf(team);const color=teamColors[ci]||'#fff';
-bar.innerHTML+=`<div class="score-item"><span class="dot" style="background:${color}"></span><span class="sname">${team}</span><span class="sval">${score.toFixed(1)}pt</span></div>`;});}
-function renderBoard(){if(!adminState)return;const grid=document.getElementById('boardGrid');grid.innerHTML='';
-adminState.questions.forEach(q=>{const card=document.createElement('div');
-const solvers=[];TEAMS.forEach(t=>{const s=adminState.team_status[t]?.[String(q.id)];if(s&&s.solved)solvers.push(t);});
-card.className='b-card'+(solvers.length===6?' all-solved':'');
-const first=adminState.first_solver[String(q.id)];
-let firstHtml=first?`<div class="b-first">⚡ ${first}</div>`:'';
-let solversHtml=solvers.length?`<div class="b-solvers">${solvers.join(', ')}</div>`:'';
-card.innerHTML=`<div class="b-num">Q${q.id}</div><div class="b-title">${q.title}</div><div class="b-pts">⭐ ${q.points}点</div>${firstHtml}${solversHtml}`;
-grid.appendChild(card);});}
+if(adminState.game_started){document.getElementById('waitingScreen').style.display='none';document.getElementById('scoreScreen').style.display='block';startTimer(adminState.remaining_seconds);renderScores();}
+else{document.getElementById('waitingScreen').style.display='block';document.getElementById('scoreScreen').style.display='none';stopTimer();}}
+function startTimer(remaining){stopTimer();if(remaining==null)return;
+const timerEl=document.getElementById('headerTimer');timerEl.style.display='block';
+let rem=remaining;updateTimer(rem);
+timerInterval=setInterval(()=>{rem-=1;if(rem<0)rem=0;updateTimer(rem);if(rem<=0)stopTimer();},1000);}
+function stopTimer(){if(timerInterval){clearInterval(timerInterval);timerInterval=null;}}
+function updateTimer(sec){const el=document.getElementById('headerTimer');const m=Math.floor(sec/60);const s=Math.floor(sec%60);
+el.textContent=`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+el.className='timer';if(sec<=60)el.classList.add('danger');else if(sec<=300)el.classList.add('warning');}
+function renderScores(oldScores){if(!adminState)return;const container=document.getElementById('scoreCards');
+const sorted=Object.entries(adminState.teams).sort((a,b)=>b[1]-a[1]);
+const maxScore=Math.max(...sorted.map(s=>s[1]),1);
+const rankEmoji=['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣'];
+container.innerHTML='';
+sorted.forEach(([team,score],i)=>{const ci=TEAMS.indexOf(team);const color=teamColors[ci]||'#fff';const bg=barColors[ci]||'linear-gradient(90deg,#fff,#aaa)';
+const pct=Math.max((score/maxScore)*100,2);
+const solved=Object.values(adminState.team_status[team]||{}).filter(s=>s.solved).length;
+const row=document.createElement('div');
+row.className='score-row'+(i<3?` rank-${i+1}`:'');
+row.id='row-'+team;
+// Delta animation
+let deltaHtml='';
+if(oldScores&&oldScores[team]!==undefined){const diff=score-oldScores[team];
+if(Math.abs(diff)>0.01){const cls=diff>0?'show-plus':'show-minus';const sign=diff>0?'+':'';
+deltaHtml=`<div class="score-delta ${cls}">${sign}${diff.toFixed(1)}</div>`;
+setTimeout(()=>{row.classList.add(diff>0?'flash-plus':'flash-minus');setTimeout(()=>row.classList.remove('flash-plus','flash-minus'),800);},50);}}
+row.innerHTML=`<div class="score-rank">${rankEmoji[i]}</div><div class="score-dot" style="background:${color}"></div><div class="score-name">${team}</div><div class="score-bar-wrap"><div class="score-bar-fill" style="width:${pct}%;background:${bg}"></div></div><div class="score-val">${score.toFixed(1)}<small style="font-size:.5em">pt</small></div><div class="score-solved">${solved}/30</div>${deltaHtml}`;
+container.appendChild(row);});
+prevScores={...adminState.teams};}
 function showToast(msg){if(!msg)return;const t=document.getElementById('toast');t.textContent=msg;t.classList.remove('show');void t.offsetWidth;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),5000);}
 connect();
 </script>
