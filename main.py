@@ -13,36 +13,36 @@ TEAMS = ["A-1", "A-2", "B-1", "B-2", "C-1", "C-2"]
 
 def default_questions() -> List[dict]:
     return [
-        {"id": 1, "title": "創立年クイズ", "question": "会社の創立年は西暦何年？", "answer": "2010", "points": 2, "hint": "2000年代後半〜2010年代前半です"},
-        {"id": 2, "title": "社長の好物", "question": "社長の好きな食べ物は？", "answer": "カレー", "points": 2, "hint": "スパイシーな料理です"},
-        {"id": 3, "title": "オフィスの階数", "question": "本社オフィスは何階にある？", "answer": "5", "points": 2, "hint": "1桁の奇数です"},
-        {"id": 4, "title": "社員数", "question": "現在の社員数は約何人？", "answer": "100", "points": 2, "hint": "3桁です"},
-        {"id": 5, "title": "スローガン", "question": "会社のスローガンは？", "answer": "信頼と成長", "points": 3, "hint": "漢字4文字が2つです"},
-        {"id": 6, "title": "人気イベント", "question": "昨年の社内イベントで一番人気だったのは？", "answer": "BBQ", "points": 2, "hint": "屋外で行うイベントです"},
-        {"id": 7, "title": "公式キャラ", "question": "会社の公式キャラクターの名前は？", "answer": "いない", "points": 3, "hint": "ひっかけ問題かも？"},
-        {"id": 8, "title": "自販機の人気", "question": "自販機で一番売れている飲み物は？", "answer": "コーヒー", "points": 2, "hint": "カフェインが入っています"},
-        {"id": 9, "title": "最寄り駅", "question": "会社の最寄り駅はどこ？", "answer": "渋谷", "points": 2, "hint": "東京の主要ターミナル駅の1つです"},
-        {"id": 10, "title": "最大部署", "question": "社内で一番人数が多い部署は？", "answer": "開発部", "points": 3, "hint": "エンジニアが多い部署です"},
-        {"id": 11, "title": "設立月", "question": "会社が設立された月は？（数字で）", "answer": "4", "points": 2, "hint": "新年度が始まる月です"},
-        {"id": 12, "title": "社名の由来", "question": "社名の由来になった言葉は？", "answer": "つながり", "points": 4, "hint": "人と人の関係を表す言葉です"},
-        {"id": 13, "title": "フロアの数", "question": "オフィスは何フロアを使っている？", "answer": "2", "points": 2, "hint": "1より多く3より少ないです"},
-        {"id": 14, "title": "ランチ人気店", "question": "社員に一番人気のランチスポットは？", "answer": "コンビニ", "points": 2, "hint": "どこにでもあるお店です"},
-        {"id": 15, "title": "社内制度", "question": "社内で人気の福利厚生制度は？", "answer": "リモートワーク", "points": 3, "hint": "家でもできる働き方です"},
-        {"id": 16, "title": "会議室の名前", "question": "一番大きい会議室の名前は？", "answer": "富士", "points": 3, "hint": "日本一高い山です"},
-        {"id": 17, "title": "朝会の曜日", "question": "全社朝会は何曜日？", "answer": "月曜日", "points": 2, "hint": "週の始まりの日です"},
-        {"id": 18, "title": "創業者の出身", "question": "創業者の出身都道府県は？", "answer": "大阪", "points": 4, "hint": "西日本の大都市です"},
-        {"id": 19, "title": "ロゴの色", "question": "会社ロゴのメインカラーは？", "answer": "青", "points": 2, "hint": "空や海の色です"},
-        {"id": 20, "title": "Slack絵文字", "question": "Slackで一番使われている絵文字は？", "answer": "👍", "points": 3, "hint": "賛同を示すジェスチャーです"},
-        {"id": 21, "title": "社内部活", "question": "一番部員が多い社内部活は？", "answer": "フットサル", "points": 3, "hint": "ボールを蹴るスポーツです"},
-        {"id": 22, "title": "平均年齢", "question": "社員の平均年齢は約何歳？", "answer": "32", "points": 3, "hint": "30代前半です"},
-        {"id": 23, "title": "PC支給", "question": "入社時に支給されるPCのメーカーは？", "answer": "Mac", "points": 2, "hint": "リンゴのマークです"},
-        {"id": 24, "title": "忘年会芸", "question": "昨年の忘年会で優勝した出し物は？", "answer": "漫才", "points": 4, "hint": "お笑いの形式の1つです"},
-        {"id": 25, "title": "エレベーター", "question": "オフィスビルのエレベーターは何台？", "answer": "3", "points": 2, "hint": "奇数です"},
-        {"id": 26, "title": "社内用語", "question": "社内で「レビュー」のことを何と呼ぶ？", "answer": "レビュー", "points": 2, "hint": "そのままかも？"},
-        {"id": 27, "title": "最長在籍", "question": "最も在籍年数が長い社員は何年目？", "answer": "15", "points": 4, "hint": "10年以上です"},
-        {"id": 28, "title": "オフィス植物", "question": "オフィスに置いてある観葉植物の名前は？", "answer": "パキラ", "points": 3, "hint": "幸運の木とも呼ばれます"},
-        {"id": 29, "title": "Wi-Fiパスワード", "question": "ゲスト用Wi-Fiのパスワードのヒント：何の名前？", "answer": "会社名", "points": 2, "hint": "そのまんまです"},
-        {"id": 30, "title": "最終問題", "question": "この会社で一番大切にしている価値観は？", "answer": "チームワーク", "points": 4, "hint": "みんなで協力することです"},
+        {"id": 1, "title": "川合航平さんの犬", "question": "川合航平さんの飼っている犬の名前は？", "answer": "ぽんさん", "choices": ["ぽんさん", "ぷんさん", "ぺんさん"], "points": 3, "hint": "コバナシ"},
+        {"id": 2, "title": "出退勤システム", "question": "出退勤をWEBで行うシステムの名称は？", "answer": "TimePro-VG", "choices": ["TimePro-VG", "TimePro-XG", "TimePro-YG"], "points": 2, "hint": ""},
+        {"id": 3, "title": "大脇ジュリオ駿平さん", "question": "大脇ジュリオ駿平さんはどこのハーフ？", "answer": "ブラジル", "choices": ["ブラジル", "日本", "アメリカ"], "points": 4, "hint": "聞いてみよう"},
+        {"id": 4, "title": "ポータルサイト", "question": "MNCのポータルサイトの名称は？", "answer": "マクネコ", "choices": ["マクネコ", "マクニコ", "マクマク"], "points": 2, "hint": ""},
+        {"id": 5, "title": "渡辺弦一郎さん", "question": "渡辺弦一郎さんはどこの熱狂的なファンか？", "answer": "浦和レッズ", "choices": ["浦和レッズ", "読売ジャイアンツ", "FCバルセロナ"], "points": 4, "hint": "聞いてみよう"},
+        {"id": 6, "title": "MNCのフロア", "question": "MNCのフロアは2ビルの何階から何階まで？", "answer": "3～6階", "choices": ["3～6階", "4～6階", "3～7階"], "points": 2, "hint": ""},
+        {"id": 7, "title": "新オフィス建設予定地", "question": "新オフィスの建設予定場所は何の跡地？", "answer": "新横浜プリンスペペ", "choices": ["新横浜プリンスペペ", "ホテルアソシア新横浜", "マクニカ第1ビル"], "points": 3, "hint": ""},
+        {"id": 8, "title": "ラジオCM", "question": "マクニカのラジオCMが流れる番組名は？", "answer": "オールナイトニッポン", "choices": ["オールナイトニッポン", "ラジオ日経", "JUNK"], "points": 3, "hint": ""},
+        {"id": 9, "title": "一番売れている製品", "question": "MNCで一番売れている製品は？", "answer": "CrowdStrike", "choices": ["CrowdStrike", "Cato Networks", "Thales"], "points": 3, "hint": ""},
+        {"id": 10, "title": "和久輝さんの売上", "question": "和久輝さんの昨年度の売上は？", "answer": "106M円", "choices": ["106M円", "53M円", "20M円"], "points": 3, "hint": "PowerBI"},
+        {"id": 11, "title": "藤田光太郎さんのおすすめ", "question": "藤田光太郎さんがおすすめしている場所は？", "answer": "石垣島", "choices": ["石垣島", "マダガスカル島", "戸塚"], "points": 3, "hint": "コバナシ"},
+        {"id": 12, "title": "マッチングアプリ", "question": "社内で活用されているマッチングアプリは？", "answer": "Pinder", "choices": ["Pinder", "Ninder", "Minder"], "points": 2, "hint": ""},
+        {"id": 13, "title": "田中佑磨さんの出身", "question": "田中佑磨さんの出身県は？", "answer": "香川県", "choices": ["香川県", "福岡県", "岩手県"], "points": 3, "hint": "コバナシ"},
+        {"id": 14, "title": "品川オフィス", "question": "品川オフィスのマクニカのフロアは何階？", "answer": "5，6階", "choices": ["5，6階", "4階", "3，4階"], "points": 3, "hint": ""},
+        {"id": 15, "title": "R6グレード基本給", "question": "R6グレードの基本給の上限額は？", "answer": "45万円", "choices": ["45万円", "50万円", "60万円"], "points": 4, "hint": "人事ポータル＞人事制度"},
+        {"id": 16, "title": "齊藤諒太さん", "question": "齊藤諒太さんは何オタク？", "answer": "アイドル", "choices": ["アイドル", "鉄道", "アニメ"], "points": 3, "hint": "コバナシ"},
+        {"id": 17, "title": "CMの芸能人", "question": "マクニカのCMで起用されている芸能人は？", "answer": "キンタロー、要潤", "choices": ["キンタロー、要潤", "どぶろっく", "サンドウィッチマン"], "points": 2, "hint": ""},
+        {"id": 18, "title": "スポンサーサッカー", "question": "マクニカがスポンサーをしているサッカーチームは？", "answer": "横浜FC", "choices": ["横浜FC", "横浜F・マリノス", "湘南ベルマーレ"], "points": 2, "hint": ""},
+        {"id": 19, "title": "川合航平さんの住所", "question": "川合航平さんの昨年末まで住んでいた場所は？", "answer": "歌舞伎町", "choices": ["歌舞伎町", "渋谷", "丸の内"], "points": 4, "hint": "聞いてみよう"},
+        {"id": 20, "title": "位置確認アプリ", "question": "社員がオフィスのどこにいるか分かるアプリは？", "answer": "TeamsNavi", "choices": ["TeamsNavi", "Macnica Navi", "Phoone App"], "points": 2, "hint": ""},
+        {"id": 21, "title": "ロジの場所", "question": "マクニカのロジがある場所は？", "answer": "新子安", "choices": ["新子安", "湘南", "平塚"], "points": 2, "hint": ""},
+        {"id": 22, "title": "買収した会社", "question": "マクニカが自動運転ビジネスをするために買収した会社は？", "answer": "Naviya", "choices": ["Naviya", "CyberKnight", "グローセル"], "points": 2, "hint": ""},
+        {"id": 23, "title": "和久輝さんのルーツ", "question": "和久輝さんはどこのハーフか？", "answer": "純ジャパ", "choices": ["純ジャパ", "ポルトガル", "ブラジル"], "points": 4, "hint": "聞いてみよう"},
+        {"id": 24, "title": "日帰り出張の日当", "question": "日帰り出張をしたときにもらえる日当はいくら？", "answer": "2000円", "choices": ["2000円", "3000円", "5000円"], "points": 3, "hint": "人事ポータル＞人事制度"},
+        {"id": 25, "title": "1ビル1階の名称", "question": "新横浜1ビル1階の名称は？", "answer": "MET VALLEY", "choices": ["MET VALLEY", "MAC VALLEY", "MET HILLS"], "points": 2, "hint": ""},
+        {"id": 26, "title": "新卒2年目女性社員", "question": "新卒2年目の女性社員は何人？", "answer": "7人", "choices": ["7人", "9人", "11人"], "points": 2, "hint": ""},
+        {"id": 27, "title": "ランチ亭の予約", "question": "ランチ亭の予約締め切り時間は？", "answer": "9時25分", "choices": ["9時25分", "10時25分", "10時55分"], "points": 3, "hint": "福利厚生"},
+        {"id": 28, "title": "セキュリティ製品", "question": "マクニカが開発してるセキュリティ製品は？", "answer": "Macnica ASM", "choices": ["Macnica ASM", "Macnica EDR", "Macnica NET"], "points": 3, "hint": ""},
+        {"id": 29, "title": "社員旅行", "question": "昨年度MNCが行った社員旅行はどこ？", "answer": "名古屋", "choices": ["名古屋", "大阪", "福岡"], "points": 3, "hint": "マクネコ"},
+        {"id": 30, "title": "EDLの正式名称", "question": "EDLの正式名称は？", "answer": "Education Development Leader", "choices": ["Education Development Leader", "Education Leader", "Education Diversity Leader"], "points": 2, "hint": ""},
     ]
 
 
@@ -128,7 +128,9 @@ class QuizGame:
         if not q:
             return None
         st = self.team_status[team].get(question_id, {"solved": False, "hint_used": False, "wrong_count": 0})
-        return {"id": q["id"], "title": q["title"], "question": q["question"], "points": q["points"], "has_hint": bool(q.get("hint")), "solved": st.get("solved", False), "hint_used": st.get("hint_used", False), "wrong_count": st.get("wrong_count", 0)}
+        choices = list(q.get("choices", []))
+        random.shuffle(choices)
+        return {"id": q["id"], "title": q["title"], "question": q["question"], "points": q["points"], "has_hint": bool(q.get("hint")), "solved": st.get("solved", False), "hint_used": st.get("hint_used", False), "wrong_count": st.get("wrong_count", 0), "choices": choices}
 
     def get_admin_state(self):
         remaining = None

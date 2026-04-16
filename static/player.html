@@ -67,11 +67,11 @@ body{font-family:'Segoe UI','Hiragino Sans',sans-serif;background:linear-gradien
 .hint-area{margin-bottom:20px}
 .hint-btn{background:rgba(241,196,15,.2);border:1px solid #f1c40f;color:#f1c40f;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:.95em}
 .hint-text{margin-top:10px;padding:12px 18px;background:rgba(241,196,15,.1);border-left:3px solid #f1c40f;border-radius:0 8px 8px 0;color:#f1c40f}
-.answer-area{display:flex;gap:10px}
-.answer-input{flex:1;padding:14px;border-radius:10px;border:2px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:#fff;font-size:1.1em}
-.answer-input::placeholder{color:rgba(255,255,255,.4)}.answer-input:focus{outline:none;border-color:#667eea}
-.submit-btn{padding:14px 25px;background:linear-gradient(135deg,#667eea,#764ba2);border:none;border-radius:10px;color:#fff;font-size:1.1em;font-weight:bold;cursor:pointer}
-.submit-btn:disabled{opacity:.5;cursor:default}
+.answer-area{display:flex;flex-direction:column;gap:10px}
+.choice-btn{padding:16px 20px;border-radius:12px;border:2px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;font-size:1.1em;cursor:pointer;transition:all .3s;text-align:left;font-weight:500}
+.choice-btn:hover{border-color:rgba(102,126,234,.6);background:rgba(102,126,234,.15);transform:translateX(5px)}
+.choice-btn:disabled{opacity:.5;cursor:default;transform:none}
+.choice-btn.selected{border-color:#667eea;background:rgba(102,126,234,.2)}
 .result-msg{margin-top:15px;padding:12px 18px;border-radius:10px;font-weight:bold;text-align:center}
 .result-msg.correct{background:rgba(46,204,113,.2);color:#2ecc71;border:1px solid #2ecc71}
 .result-msg.wrong{background:rgba(231,76,60,.2);color:#e74c3c;border:1px solid #e74c3c}
@@ -144,13 +144,14 @@ function backToList(){requestState();showScreen('screenList');}
 function renderDetail(q){if(!q)return;const card=document.getElementById('detailCard');
 if(q.solved){card.innerHTML=`<div class="d-num">Q${q.id}</div><div class="d-title">${q.title}</div><div class="d-pts">⭐ ${q.points}点</div><div class="d-question">${q.question}</div><div class="solved-badge">✅ 正解済み</div>`;return;}
 let hh='';if(q.has_hint){const label=q.hint_used?'💡 ヒントを見る (表示済み)':'💡 ヒントを見る (-0.5点)';hh=`<div class="hint-area"><button class="hint-btn" id="hintBtn" onclick="useHint(${q.id})">${label}</button><div class="hint-text" id="hintText" style="display:none"></div></div>`;}
-card.innerHTML=`<div class="d-num">Q${q.id}</div><div class="d-title">${q.title}</div><div class="d-pts">⭐ ${q.points}点</div><div class="d-question">${q.question}</div>${hh}<div class="answer-area"><input class="answer-input" id="answerInput" placeholder="回答を入力..." autocomplete="off"><button class="submit-btn" id="submitBtn" onclick="submitAnswer(${q.id})">送信</button></div><div id="resultArea"></div>`;
-if(q.wrong_count>0)document.getElementById('resultArea').innerHTML=`<div class="result-msg wrong">誤答 ${q.wrong_count}回</div>`;
-const inp=document.getElementById('answerInput');if(inp)inp.addEventListener('keypress',e=>{if(e.key==='Enter')submitAnswer(q.id);});}
+let choicesHtml='';if(q.choices&&q.choices.length){choicesHtml='<div class="answer-area">'+q.choices.map(c=>`<button class="choice-btn" onclick="submitChoice(${q.id},this,'${c.replace(/'/g,"\\'")}')">` +c+'</button>').join('')+'</div>';}
+card.innerHTML=`<div class="d-num">Q${q.id}</div><div class="d-title">${q.title}</div><div class="d-pts">⭐ ${q.points}点</div><div class="d-question">${q.question}</div>${hh}${choicesHtml}<div id="resultArea"></div>`;
+if(q.wrong_count>0)document.getElementById('resultArea').innerHTML=`<div class="result-msg wrong">誤答 ${q.wrong_count}回</div>`;}
+function submitChoice(qid,btn,answer){const btns=document.querySelectorAll('.choice-btn');btns.forEach(b=>b.disabled=true);btn.classList.add('selected');ws.send(JSON.stringify({type:'answer',team:myTeam,question_id:qid,answer:answer}));}
 function submitAnswer(qid){const inp=document.getElementById('answerInput');if(!inp||!inp.value.trim())return;document.getElementById('submitBtn').disabled=true;ws.send(JSON.stringify({type:'answer',team:myTeam,question_id:qid,answer:inp.value.trim()}));}
 function showAnswerResult(data){const area=document.getElementById('resultArea');if(!area)return;
 if(data.correct){area.innerHTML=`<div class="result-msg correct">🎉 ${data.message} (+${data.points_earned}点)</div>`;setTimeout(()=>{requestState();showScreen('screenList');},2000);}
-else{area.innerHTML=`<div class="result-msg wrong">${data.message}</div>`;const btn=document.getElementById('submitBtn');if(btn)btn.disabled=false;const inp=document.getElementById('answerInput');if(inp){inp.value='';inp.focus();}}}
+else{area.innerHTML=`<div class="result-msg wrong">${data.message}</div>`;const btns=document.querySelectorAll('.choice-btn');btns.forEach(b=>{b.disabled=false;b.classList.remove('selected');});}}
 function useHint(qid){ws.send(JSON.stringify({type:'use_hint',team:myTeam,question_id:qid}));}
 function showHint(data){if(!data.success)return;const ht=document.getElementById('hintText'),hb=document.getElementById('hintBtn');if(ht){ht.textContent='💡 '+data.hint;ht.style.display='block';}if(hb){hb.textContent='💡 ヒント表示済み';hb.onclick=null;}if(!data.already_used)showToast(data.message);}
 function showToast(msg){if(!msg)return;const t=document.getElementById('toast');t.textContent=msg;t.classList.remove('show');void t.offsetWidth;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),4000);}
