@@ -29,6 +29,13 @@ body{font-family:'Segoe UI','Hiragino Sans',sans-serif;background:linear-gradien
 .score-bar-fill{height:100%;border-radius:20px;transition:width 1s ease;min-width:5px}
 .score-val{font-size:2.2em;font-weight:bold;color:#ffd700;min-width:120px;text-align:right;text-shadow:0 0 15px rgba(255,215,0,.4)}
 .score-solved{font-size:1em;color:#aaa;min-width:60px;text-align:right}
+.score-hidden .score-val,.score-hidden .score-bar-fill,.score-hidden .score-solved,.score-hidden .score-rank{visibility:hidden}
+.last-min-overlay{text-align:center;font-size:3em;font-weight:bold;color:#ffd700;animation:pulseGlow 1.5s infinite;margin-bottom:30px}
+@keyframes pulseGlow{0%,100%{text-shadow:0 0 10px rgba(255,215,0,.3)}50%{text-shadow:0 0 30px rgba(255,215,0,.8)}}
+.result-mode .score-title{font-size:3em;animation:resultIn 1s ease}
+@keyframes resultIn{0%{opacity:0;transform:scale(.5)}100%{opacity:1;transform:scale(1)}}
+.result-reveal{animation:revealRow .8s ease both}
+@keyframes revealRow{0%{opacity:0;transform:translateX(100px)}100%{opacity:1;transform:translateX(0)}}
 /* Score change animation */
 .score-delta{position:absolute;right:200px;font-size:1.5em;font-weight:bold;opacity:0;pointer-events:none}
 .score-delta.show-plus{color:#2ecc71;animation:floatUp 2s forwards}
@@ -48,14 +55,14 @@ body{font-family:'Segoe UI','Hiragino Sans',sans-serif;background:linear-gradien
 <div class="header"><h1>🎯 社内クイズ大会</h1><div class="timer" id="headerTimer" style="display:none">20:00</div></div>
 <div class="main">
 <div class="waiting" id="waitingScreen"><div class="emoji">🎮</div><h2>クイズ大会</h2><p>まもなく開始します...</p></div>
-<div class="score-main" id="scoreScreen" style="display:none"><div class="score-title">🏆 スコアボード</div><div class="score-cards" id="scoreCards"></div></div>
+<div class="score-main" id="scoreScreen" style="display:none"><div id="lastMinOverlay" class="last-min-overlay" style="display:none">🔥 ラスト1分！スコア非公開！ 🔥</div><div class="score-title" id="scoreTitle">🏆 スコアボード</div><div class="score-cards" id="scoreCards"></div></div>
 </div>
 <div class="toast" id="toast"></div>
 <script>
 const TEAMS=["A-1","A-2","B-1","B-2","C-1","C-2"];
 const teamColors=['#f5576c','#4facfe','#43e97b','#fee140','#a18cd1','#fccb90'];
 const barColors=['linear-gradient(90deg,#f5576c,#f093fb)','linear-gradient(90deg,#4facfe,#00f2fe)','linear-gradient(90deg,#43e97b,#38f9d7)','linear-gradient(90deg,#fa709a,#fee140)','linear-gradient(90deg,#a18cd1,#fbc2eb)','linear-gradient(90deg,#fccb90,#d57eeb)'];
-let ws,adminState=null,prevScores={},timerInterval=null;
+let ws,adminState=null,prevScores={},timerInterval=null,isLastMinute=false,currentGameState='waiting';
 function connect(){const p=location.protocol==='https:'?'wss:':'ws:';ws=new WebSocket(`${p}//${location.host}/ws/admin`);
 ws.onmessage=e=>{const msg=JSON.parse(e.data);
 if(msg.type==='admin_state'){adminState=msg.data;render();}
@@ -63,12 +70,17 @@ else if(msg.type==='scores_update'&&adminState){const oldScores={...adminState.t
 else if(msg.type==='event'&&msg.data){const parts=[msg.data.bonus_msg,msg.data.penalty_msg,msg.data.message].filter(Boolean);if(parts.length)showToast(parts.join(' / '));}};
 ws.onclose=()=>setTimeout(connect,2000);}
 function render(){if(!adminState)return;
-if(adminState.game_started){document.getElementById('waitingScreen').style.display='none';document.getElementById('scoreScreen').style.display='block';startTimer(adminState.remaining_seconds);renderScores();}
-else{document.getElementById('waitingScreen').style.display='block';document.getElementById('scoreScreen').style.display='none';stopTimer();}}
+const gs=adminState.game_state||'waiting';currentGameState=gs;
+if(gs==='running'){document.getElementById('waitingScreen').style.display='none';document.getElementById('scoreScreen').style.display='block';document.getElementById('scoreScreen').classList.remove('result-mode');document.getElementById('scoreTitle').textContent='🏆 スコアボード';startTimer(adminState.remaining_seconds);renderScores();}
+else if(gs==='ended'){document.getElementById('waitingScreen').style.display='none';document.getElementById('scoreScreen').style.display='block';document.getElementById('scoreScreen').classList.remove('result-mode');document.getElementById('scoreTitle').textContent='⏰ ゲーム終了 - 結果発表をお待ちください';stopTimer();isLastMinute=true;renderScores();}
+else if(gs==='result'){document.getElementById('waitingScreen').style.display='none';document.getElementById('scoreScreen').style.display='block';document.getElementById('lastMinOverlay').style.display='none';document.getElementById('scoreScreen').classList.add('result-mode');document.getElementById('scoreTitle').textContent='🏆🎉 最終結果発表 🎉🏆';stopTimer();isLastMinute=false;renderResultScores();}
+else{document.getElementById('waitingScreen').style.display='block';document.getElementById('scoreScreen').style.display='none';stopTimer();isLastMinute=false;}}
 function startTimer(remaining){stopTimer();if(remaining==null)return;
 const timerEl=document.getElementById('headerTimer');timerEl.style.display='block';
 let rem=remaining;updateTimer(rem);
-timerInterval=setInterval(()=>{rem-=1;if(rem<0)rem=0;updateTimer(rem);if(rem<=0)stopTimer();},1000);}
+timerInterval=setInterval(()=>{rem-=1;if(rem<0)rem=0;updateTimer(rem);
+if(rem<=60&&!isLastMinute){isLastMinute=true;document.getElementById('lastMinOverlay').style.display='block';renderScores();}
+if(rem<=0)stopTimer();},1000);}
 function stopTimer(){if(timerInterval){clearInterval(timerInterval);timerInterval=null;}}
 function updateTimer(sec){const el=document.getElementById('headerTimer');const m=Math.floor(sec/60);const s=Math.floor(sec%60);
 el.textContent=`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
@@ -78,21 +90,38 @@ const sorted=Object.entries(adminState.teams).sort((a,b)=>b[1]-a[1]);
 const maxScore=Math.max(...sorted.map(s=>s[1]),1);
 const rankEmoji=['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣'];
 container.innerHTML='';
+const hideScores=isLastMinute||currentGameState==='ended';
 sorted.forEach(([team,score],i)=>{const ci=TEAMS.indexOf(team);const color=teamColors[ci]||'#fff';const bg=barColors[ci]||'linear-gradient(90deg,#fff,#aaa)';
 const pct=Math.max((score/maxScore)*100,2);
 const solved=Object.values(adminState.team_status[team]||{}).filter(s=>s.solved).length;
 const row=document.createElement('div');
-row.className='score-row'+(i<3?` rank-${i+1}`:'');
+row.className='score-row'+(i<3?` rank-${i+1}`:'')+(hideScores?' score-hidden':'');
 row.id='row-'+team;
-// Delta animation
 let deltaHtml='';
-if(oldScores&&oldScores[team]!==undefined){const diff=score-oldScores[team];
+if(!hideScores&&oldScores&&oldScores[team]!==undefined){const diff=score-oldScores[team];
 if(Math.abs(diff)>0.01){const cls=diff>0?'show-plus':'show-minus';const sign=diff>0?'+':'';
 deltaHtml=`<div class="score-delta ${cls}">${sign}${diff.toFixed(1)}</div>`;
 setTimeout(()=>{row.classList.add(diff>0?'flash-plus':'flash-minus');setTimeout(()=>row.classList.remove('flash-plus','flash-minus'),800);},50);}}
-row.innerHTML=`<div class="score-rank">${rankEmoji[i]}</div><div class="score-dot" style="background:${color}"></div><div class="score-name">${team}</div><div class="score-bar-wrap"><div class="score-bar-fill" style="width:${pct}%;background:${bg}"></div></div><div class="score-val">${score.toFixed(1)}<small style="font-size:.5em">pt</small></div><div class="score-solved">${solved}/30</div>${deltaHtml}`;
+const displayScore=hideScores?'???':''+score.toFixed(1);
+const displaySolved=hideScores?'?/30':''+solved+'/30';
+const displayRank=hideScores?'❓':rankEmoji[i];
+row.innerHTML=`<div class="score-rank">${displayRank}</div><div class="score-dot" style="background:${color}"></div><div class="score-name">${team}</div><div class="score-bar-wrap"><div class="score-bar-fill" style="width:${hideScores?50:pct}%;background:${bg}"></div></div><div class="score-val">${displayScore}<small style="font-size:.5em">${hideScores?'':'pt'}</small></div><div class="score-solved">${displaySolved}</div>${deltaHtml}`;
 container.appendChild(row);});
 prevScores={...adminState.teams};}
+function renderResultScores(){if(!adminState)return;const container=document.getElementById('scoreCards');
+const sorted=Object.entries(adminState.teams).sort((a,b)=>b[1]-a[1]);
+const maxScore=Math.max(...sorted.map(s=>s[1]),1);
+const rankEmoji=['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣'];
+container.innerHTML='';
+sorted.forEach(([team,score],i)=>{const ci=TEAMS.indexOf(team);const color=teamColors[ci]||'#fff';const bg=barColors[ci]||'linear-gradient(90deg,#fff,#aaa)';
+const pct=Math.max((score/maxScore)*100,2);
+const solved=Object.values(adminState.team_status[team]||{}).filter(s=>s.solved).length;
+const row=document.createElement('div');
+const revealIdx=sorted.length-1-i;
+row.className='score-row'+(i<3?` rank-${i+1}`:'')+' result-reveal';
+row.style.animationDelay=(revealIdx*0.5)+'s';
+row.innerHTML=`<div class="score-rank">${rankEmoji[i]}</div><div class="score-dot" style="background:${color}"></div><div class="score-name">${team}</div><div class="score-bar-wrap"><div class="score-bar-fill" style="width:${pct}%;background:${bg}"></div></div><div class="score-val">${score.toFixed(1)}<small style="font-size:.5em">pt</small></div><div class="score-solved">${solved}/30</div>`;
+container.appendChild(row);});}
 function showToast(msg){if(!msg)return;const t=document.getElementById('toast');t.textContent=msg;t.classList.remove('show');void t.offsetWidth;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),5000);}
 connect();
 </script>

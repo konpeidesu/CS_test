@@ -55,11 +55,17 @@ class QuizGame:
         self.random_penalty: Dict[int, Optional[str]] = {}
         self.connections: List[WebSocket] = []
         self.admin_connections: List[WebSocket] = []
-        self.game_started: bool = False
+        self.game_state: str = "waiting"  # waiting / running / ended / result
         self.game_start_time: Optional[float] = None
         self.time_limit: int = 1200  # 20 minutes
 
+    @property
+    def game_started(self):
+        return self.game_state == "running"
+
     def submit_answer(self, team, question_id, answer):
+        if self.game_state != "running":
+            return {"success": False, "message": "ゲームは終了しました"}
         if team not in self.teams:
             return {"success": False, "message": "無効なチームです"}
         q = next((q for q in self.questions if q["id"] == question_id), None)
@@ -115,7 +121,7 @@ class QuizGame:
         for q in self.questions:
             st = self.team_status[team].get(q["id"], {"solved": False, "hint_used": False, "wrong_count": 0})
             qs.append({"id": q["id"], "title": q["title"], "points": q["points"], "has_hint": bool(q.get("hint")), "solved": st.get("solved", False), "hint_used": st.get("hint_used", False), "wrong_count": st.get("wrong_count", 0)})
-        return {"team": team, "score": self.teams[team], "questions": qs, "game_started": self.game_started}
+        return {"team": team, "score": self.teams[team], "questions": qs, "game_started": self.game_state == "running", "game_state": self.game_state}
 
     def get_question_detail(self, question_id, team):
         q = next((qn for qn in self.questions if qn["id"] == question_id), None)
@@ -126,10 +132,10 @@ class QuizGame:
 
     def get_admin_state(self):
         remaining = None
-        if self.game_started and self.game_start_time:
+        if self.game_state == "running" and self.game_start_time:
             elapsed = time.time() - self.game_start_time
             remaining = max(0, self.time_limit - elapsed)
-        return {"teams": {t: self.teams[t] for t in TEAMS}, "team_status": {t: {str(qid): s for qid, s in statuses.items()} for t, statuses in self.team_status.items()}, "first_solver": {str(k): v for k, v in self.first_solver.items()}, "random_penalty": {str(k): v for k, v in self.random_penalty.items()}, "questions": self.questions, "game_started": self.game_started, "remaining_seconds": remaining}
+        return {"teams": {t: self.teams[t] for t in TEAMS}, "team_status": {t: {str(qid): s for qid, s in statuses.items()} for t, statuses in self.team_status.items()}, "first_solver": {str(k): v for k, v in self.first_solver.items()}, "random_penalty": {str(k): v for k, v in self.random_penalty.items()}, "questions": self.questions, "game_started": self.game_state == "running", "game_state": self.game_state, "remaining_seconds": remaining}
 
     def reset(self):
         conns = self.connections
@@ -213,7 +219,7 @@ async def admin_ws(websocket: WebSocket):
             data = await websocket.receive_text()
             msg = json.loads(data)
             if msg["type"] == "start_game":
-                game.game_started = True
+                game.game_state = "running"
                 game.game_start_time = time.time()
                 await broadcast_event({"message": "ゲームが開始されました！"})
                 await broadcast_admin()
@@ -223,8 +229,23 @@ async def admin_ws(websocket: WebSocket):
                     except Exception:
                         pass
             elif msg["type"] == "stop_game":
-                game.game_started = False
+                game.game_state = "waiting"
                 await broadcast_admin()
+            elif msg["type"] == "end_game":
+                game.game_state = "ended"
+                await broadcast_event({"message": "⏰ ゲーム終了！"})
+                await broadcast_admin()
+                for ws in game.connections:
+                    try:
+                        await ws.send_text(json.dumps({"type": "game_ended"}, ensure_ascii=False))
+                    except Exception:
+                        pass
+            elif msg["type"] == "show_results":
+                if game.game_state == "ended":
+                    game.game_state = "result"
+                    await broadcast_event({"message": "🏆 結果発表！"})
+                    await broadcast_admin()
+                    await broadcast_scores()
             elif msg["type"] == "reset":
                 game.reset()
                 await broadcast_admin()

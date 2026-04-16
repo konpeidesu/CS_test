@@ -22,7 +22,10 @@ body{font-family:'Segoe UI','Hiragino Sans',sans-serif;background:linear-gradien
 .btn:hover{transform:scale(1.05)}
 .btn-start{background:#2ecc71;color:#fff;padding:15px 30px;font-size:1.2em;width:100%}
 .btn-stop{background:#e67e22;color:#fff;padding:15px 30px;font-size:1.2em;width:100%}
-.btn-reset{background:#e74c3c;color:#fff;width:100%;margin-top:10px}
+.btn-end{background:#e74c3c;color:#fff;padding:15px 30px;font-size:1.2em;width:100%;margin-top:8px}
+.btn-result{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:15px 30px;font-size:1.2em;width:100%;margin-top:8px}
+.btn-result:disabled{opacity:.4;cursor:default;transform:none}
+.btn-reset{background:#555;color:#fff;width:100%;margin-top:10px}
 .score-table{width:100%;border-collapse:collapse}
 .score-table th,.score-table td{padding:10px;text-align:left;border-bottom:1px solid rgba(255,255,255,.1)}
 .score-table th{color:#aaa;font-size:.85em}
@@ -42,7 +45,7 @@ body{font-family:'Segoe UI','Hiragino Sans',sans-serif;background:linear-gradien
 <div class="header"><h1>🎮 クイズ大会 管理パネル</h1><div class="status-badge" id="statusBadge">⏳ 待機中</div><div class="timer-display" id="timerDisplay" style="display:none">20:00</div></div>
 <div class="grid">
 <div class="card"><h3>📊 スコアボード</h3><table class="score-table" id="scoreTable"><thead><tr><th>チーム</th><th>スコア</th><th>正解数</th></tr></thead><tbody></tbody></table></div>
-<div class="card"><h3>🎮 コントロール</h3><button class="btn btn-start" id="btnStart" onclick="startGame()">▶ ゲーム開始</button><button class="btn btn-stop" id="btnStop" onclick="stopGame()" style="display:none">⏸ ゲーム停止</button><button class="btn btn-reset" onclick="resetGame()">🔄 リセット</button></div>
+<div class="card"><h3>🎮 コントロール</h3><button class="btn btn-start" id="btnStart" onclick="startGame()">▶ ゲーム開始</button><button class="btn btn-stop" id="btnStop" onclick="stopGame()" style="display:none">⏸ ゲーム一時停止</button><button class="btn btn-end" id="btnEnd" onclick="endGame()" style="display:none">⏹ ゲーム終了</button><button class="btn btn-result" id="btnResult" onclick="showResults()" disabled>🏆 結果発表</button><button class="btn btn-reset" onclick="resetGame()">🔄 リセット</button></div>
 <div class="card full"><h3>📋 全チーム進捗</h3><div id="progressArea"></div></div>
 <div class="card full"><h3>📝 イベントログ</h3><div class="event-log" id="eventLog"></div></div>
 </div>
@@ -53,12 +56,15 @@ if(msg.type==='admin_state'){state=msg.data;render();}
 else if(msg.type==='scores_update'&&state){state.teams=msg.data;renderScores();}
 else if(msg.type==='event'&&msg.data){logEvent(msg.data);}};ws.onclose=()=>setTimeout(connect,2000);}
 function render(){if(!state)return;renderScores();renderProgress();
-const badge=document.getElementById('statusBadge');const btnStart=document.getElementById('btnStart');const btnStop=document.getElementById('btnStop');const timerEl=document.getElementById('timerDisplay');
-if(state.game_started){badge.textContent='🟢 ゲーム中';badge.className='status-badge status-on';btnStart.style.display='none';btnStop.style.display='block';timerEl.style.display='block';startTimer(state.remaining_seconds);}
-else{badge.textContent='⏳ 待機中';badge.className='status-badge status-off';btnStart.style.display='block';btnStop.style.display='none';timerEl.style.display='none';stopTimer();}}
+const badge=document.getElementById('statusBadge');const btnStart=document.getElementById('btnStart');const btnStop=document.getElementById('btnStop');const btnEnd=document.getElementById('btnEnd');const btnResult=document.getElementById('btnResult');const timerEl=document.getElementById('timerDisplay');
+const gs=state.game_state||'waiting';
+if(gs==='running'){badge.textContent='🟢 ゲーム中';badge.className='status-badge status-on';btnStart.style.display='none';btnStop.style.display='block';btnEnd.style.display='block';btnResult.disabled=true;timerEl.style.display='block';startTimer(state.remaining_seconds);}
+else if(gs==='ended'){badge.textContent='🔴 ゲーム終了';badge.className='status-badge status-off';btnStart.style.display='none';btnStop.style.display='none';btnEnd.style.display='none';btnResult.disabled=false;timerEl.style.display='block';stopTimer();updateTimerDisplay(0);}
+else if(gs==='result'){badge.textContent='🏆 結果発表中';badge.className='status-badge status-on';btnStart.style.display='none';btnStop.style.display='none';btnEnd.style.display='none';btnResult.disabled=true;timerEl.style.display='none';stopTimer();}
+else{badge.textContent='⏳ 待機中';badge.className='status-badge status-off';btnStart.style.display='block';btnStop.style.display='none';btnEnd.style.display='none';btnResult.disabled=true;timerEl.style.display='none';stopTimer();}}
 function startTimer(remaining){stopTimer();if(remaining==null)return;
 let rem=remaining;updateTimerDisplay(rem);
-timerInterval=setInterval(()=>{rem-=1;if(rem<0)rem=0;updateTimerDisplay(rem);if(rem<=0){stopTimer();logEvent({message:'⏰ 制限時間終了！'});}},1000);}
+timerInterval=setInterval(()=>{rem-=1;if(rem<0)rem=0;updateTimerDisplay(rem);if(rem<=0){stopTimer();endGame();}},1000);}
 function stopTimer(){if(timerInterval){clearInterval(timerInterval);timerInterval=null;}}
 function updateTimerDisplay(sec){const el=document.getElementById('timerDisplay');const m=Math.floor(sec/60);const s=Math.floor(sec%60);
 el.textContent=`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
@@ -82,6 +88,8 @@ if(data.message)html+=`<div>${data.message}</div>`;
 log.innerHTML=html+log.innerHTML;}
 function startGame(){ws.send(JSON.stringify({type:'start_game'}));}
 function stopGame(){ws.send(JSON.stringify({type:'stop_game'}));}
+function endGame(){ws.send(JSON.stringify({type:'end_game'}));}
+function showResults(){ws.send(JSON.stringify({type:'show_results'}));}
 function resetGame(){if(confirm('ゲームをリセットしますか？'))ws.send(JSON.stringify({type:'reset'}));}
 connect();
 </script>
