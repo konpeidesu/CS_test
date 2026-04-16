@@ -1,0 +1,130 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>クイズ大会</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI','Hiragino Sans',sans-serif;background:linear-gradient(135deg,#0f0c29,#302b63,#24243e);color:#fff;min-height:100vh}
+.header{background:rgba(0,0,0,.3);padding:12px 20px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:100}
+.header h1{font-size:1.1em}.team-info{display:flex;align-items:center;gap:12px}
+.team-badge{background:rgba(255,255,255,.15);padding:5px 15px;border-radius:20px;font-size:.9em}
+.score-display{color:#ffd700;font-weight:bold;font-size:1.1em}
+.container{max-width:900px;margin:0 auto;padding:20px}
+.screen{display:none}.screen.active{display:block}
+.team-select-title{text-align:center;font-size:1.8em;margin:40px 0 30px;font-weight:bold}
+.team-grid{display:grid;grid-template-columns:1fr 1fr;gap:15px;max-width:400px;margin:0 auto}
+.team-btn{padding:22px;font-size:1.3em;border:none;border-radius:15px;cursor:pointer;font-weight:bold;color:#fff;transition:all .3s}
+.team-btn:hover{transform:scale(1.05);filter:brightness(1.2)}
+.team-btn:nth-child(1){background:linear-gradient(135deg,#f093fb,#f5576c)}
+.team-btn:nth-child(2){background:linear-gradient(135deg,#4facfe,#00f2fe)}
+.team-btn:nth-child(3){background:linear-gradient(135deg,#43e97b,#38f9d7)}
+.team-btn:nth-child(4){background:linear-gradient(135deg,#fa709a,#fee140)}
+.team-btn:nth-child(5){background:linear-gradient(135deg,#a18cd1,#fbc2eb)}
+.team-btn:nth-child(6){background:linear-gradient(135deg,#fccb90,#d57eeb)}
+.confirm-box{text-align:center;margin-top:60px}
+.confirm-box h2{font-size:1.5em;margin-bottom:20px}
+.confirm-team{font-size:2.5em;font-weight:bold;margin:20px 0;padding:20px;background:rgba(255,255,255,.1);border-radius:15px;display:inline-block}
+.confirm-btns{display:flex;gap:15px;justify-content:center;margin-top:30px}
+.btn{padding:14px 35px;border:none;border-radius:12px;font-size:1.1em;cursor:pointer;font-weight:bold;transition:all .3s}
+.btn:hover{transform:scale(1.05)}
+.btn-primary{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff}
+.btn-secondary{background:rgba(255,255,255,.2);color:#fff}
+.q-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media(max-width:600px){.q-grid{grid-template-columns:repeat(2,1fr)}}
+.q-card{background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.15);border-radius:12px;padding:15px;cursor:pointer;transition:all .3s;text-align:center}
+.q-card:hover{transform:translateY(-3px);border-color:rgba(255,255,255,.4)}
+.q-card.solved{border-color:#2ecc71;background:rgba(46,204,113,.15)}
+.q-card .q-num{font-size:.8em;color:#aaa}.q-card .q-title{font-size:1em;font-weight:bold;margin:6px 0}
+.q-card .q-pts{font-size:.85em;color:#ffd700}
+.q-card .q-status{font-size:.75em;margin-top:6px;padding:3px 8px;border-radius:10px;display:inline-block}
+.status-unsolved{background:rgba(255,255,255,.1);color:#aaa}
+.status-solved{background:rgba(46,204,113,.3);color:#2ecc71}
+.status-hint{background:rgba(241,196,15,.3);color:#f1c40f}
+.status-wrong{background:rgba(231,76,60,.3);color:#e74c3c}
+.detail-back{display:inline-flex;align-items:center;gap:5px;color:#aaa;cursor:pointer;margin-bottom:20px;font-size:.95em}
+.detail-back:hover{color:#fff}
+.detail-card{background:rgba(255,255,255,.08);border-radius:15px;padding:25px}
+.d-num{color:#aaa;font-size:.9em}.d-title{font-size:1.5em;font-weight:bold;margin:8px 0}
+.d-pts{color:#ffd700;margin-bottom:20px}
+.d-question{font-size:1.2em;line-height:1.6;margin-bottom:25px;padding:20px;background:rgba(255,255,255,.05);border-radius:10px}
+.hint-area{margin-bottom:20px}
+.hint-btn{background:rgba(241,196,15,.2);border:1px solid #f1c40f;color:#f1c40f;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:.95em}
+.hint-text{margin-top:10px;padding:12px 18px;background:rgba(241,196,15,.1);border-left:3px solid #f1c40f;border-radius:0 8px 8px 0;color:#f1c40f}
+.answer-area{display:flex;gap:10px}
+.answer-input{flex:1;padding:14px;border-radius:10px;border:2px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:#fff;font-size:1.1em}
+.answer-input::placeholder{color:rgba(255,255,255,.4)}.answer-input:focus{outline:none;border-color:#667eea}
+.submit-btn{padding:14px 25px;background:linear-gradient(135deg,#667eea,#764ba2);border:none;border-radius:10px;color:#fff;font-size:1.1em;font-weight:bold;cursor:pointer}
+.submit-btn:disabled{opacity:.5;cursor:default}
+.result-msg{margin-top:15px;padding:12px 18px;border-radius:10px;font-weight:bold;text-align:center}
+.result-msg.correct{background:rgba(46,204,113,.2);color:#2ecc71;border:1px solid #2ecc71}
+.result-msg.wrong{background:rgba(231,76,60,.2);color:#e74c3c;border:1px solid #e74c3c}
+.solved-badge{text-align:center;padding:20px;background:rgba(46,204,113,.15);border-radius:10px;color:#2ecc71;font-size:1.3em;font-weight:bold}
+.toast{position:fixed;top:70px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.9);padding:12px 25px;border-radius:10px;z-index:200;display:none;text-align:center;border:1px solid #ffd700;max-width:90%}
+.toast.show{display:block;animation:fadeInOut 4s}
+@keyframes fadeInOut{0%{opacity:0}10%{opacity:1}80%{opacity:1}100%{opacity:0}}
+.waiting-box{text-align:center;margin-top:80px}
+.waiting-box .emoji{font-size:4em;animation:bounce 2s infinite}
+@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-15px)}}
+.waiting-box h2{font-size:1.8em;margin:20px 0}.waiting-box p{color:#aaa;font-size:1.1em}
+</style>
+</head>
+<body>
+<div class="header"><h1>&#127919; &#31038;&#20869;&#12463;&#12452;&#12474;&#22823;&#20250;</h1><div class="team-info" id="teamInfo" style="display:none"><span class="team-badge" id="headerTeam"></span><span class="score-display" id="headerScore">0 pt</span></div></div>
+<div class="container">
+<div class="screen active" id="screenSelect"><div class="team-select-title">&#12481;&#12540;&#12512;&#12434;&#36984;&#25246;&#12375;&#12390;&#12367;&#12384;&#12373;&#12356;</div><div class="team-grid" id="teamGrid"></div></div>
+<div class="screen" id="screenConfirm"><div class="confirm-box"><h2>&#12371;&#12398;&#12481;&#12540;&#12512;&#12391;&#21442;&#21152;&#12375;&#12414;&#12377;&#12363;&#65311;</h2><div class="confirm-team" id="confirmTeamName"></div><div class="confirm-btns"><button class="btn btn-secondary" onclick="backToSelect()">&#8592; &#25147;&#12427;</button><button class="btn btn-primary" onclick="confirmTeam()">&#21442;&#21152;&#12377;&#12427; &#8594;</button></div></div></div>
+<div class="screen" id="screenWaiting"><div class="waiting-box"><div class="emoji">&#9203;</div><h2>&#12466;&#12540;&#12512;&#38283;&#22987;&#12434;&#12362;&#24453;&#12385;&#12367;&#12384;&#12373;&#12356;</h2><p>&#31649;&#29702;&#32773;&#12364;&#12466;&#12540;&#12512;&#12434;&#38283;&#22987;&#12375;&#12414;&#12377;</p></div></div>
+<div class="screen" id="screenList"><div class="q-grid" id="qGrid"></div></div>
+<div class="screen" id="screenDetail"><div class="detail-back" onclick="backToList()">&#8592; &#21839;&#38988;&#19968;&#35239;&#12395;&#25147;&#12427;</div><div class="detail-card" id="detailCard"></div></div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+const TEAMS=["A-1","A-2","B-1","B-2","C-1","C-2"];
+let ws,myTeam=null,gameState=null,currentQid=null;
+function connect(){const p=location.protocol==='https:'?'wss:':'ws:';ws=new WebSocket(p+'//'+location.host+'/ws/player');ws.onmessage=handleMessage;ws.onclose=function(){setTimeout(connect,2000);};}
+function handleMessage(e){const msg=JSON.parse(e.data);
+if(msg.type==='team_state'){gameState=msg.data;renderList();updateHeader();if(gameState.game_started&&document.getElementById('screenWaiting').classList.contains('active'))showScreen('screenList');}
+else if(msg.type==='question_detail')renderDetail(msg.data);
+else if(msg.type==='answer_result')showAnswerResult(msg.data);
+else if(msg.type==='hint_result')showHintResult(msg.data);
+else if(msg.type==='scores_update'){if(gameState&&myTeam){gameState.score=msg.data[myTeam]||0;updateHeader();}}
+else if(msg.type==='game_started'){if(myTeam){requestState();showScreen('screenList');}}
+else if(msg.type==='game_reset'){myTeam=null;gameState=null;showScreen('screenSelect');document.getElementById('teamInfo').style.display='none';}
+else if(msg.type==='event'&&msg.data){var parts=[msg.data.bonus_msg,msg.data.penalty_msg,msg.data.message].filter(Boolean);if(parts.length)showToast(parts.join(' / '));}}
+function showScreen(id){var screens=document.querySelectorAll('.screen');for(var i=0;i<screens.length;i++)screens[i].classList.remove('active');document.getElementById(id).classList.add('active');}
+function updateHeader(){if(!gameState)return;document.getElementById('headerScore').textContent=gameState.score.toFixed(1)+' pt';}
+function requestState(){if(ws&&myTeam)ws.send(JSON.stringify({type:'get_state',team:myTeam}));}
+var grid=document.getElementById('teamGrid');
+TEAMS.forEach(function(t){var b=document.createElement('button');b.className='team-btn';b.textContent=t;b.onclick=function(){selectTeam(t);};grid.appendChild(b);});
+function selectTeam(t){myTeam=t;document.getElementById('confirmTeamName').textContent=t;showScreen('screenConfirm');}
+function backToSelect(){myTeam=null;showScreen('screenSelect');}
+function confirmTeam(){document.getElementById('teamInfo').style.display='flex';document.getElementById('headerTeam').textContent=myTeam;requestState();showScreen('screenWaiting');}
+function renderList(){if(!gameState)return;var g=document.getElementById('qGrid');g.innerHTML='';
+gameState.questions.forEach(function(q){var card=document.createElement('div');card.className='q-card'+(q.solved?' solved':'');
+var st='未回答',sc='status-unsolved';
+if(q.solved){st='✅ 正解済み';sc='status-solved';}
+else if(q.wrong_count>0&&q.hint_used){st='❌x'+q.wrong_count+' 💡済';sc='status-wrong';}
+else if(q.wrong_count>0){st='❌x'+q.wrong_count;sc='status-wrong';}
+else if(q.hint_used){st='💡 ヒント済';sc='status-hint';}
+card.innerHTML='<div class="q-num">Q'+q.id+'</div><div class="q-title">'+q.title+'</div><div class="q-pts">⭐ '+q.points+'点</div><div class="q-status '+sc+'">'+st+'</div>';
+card.onclick=(function(id){return function(){openQuestion(id);};})(q.id);g.appendChild(card);});}
+function openQuestion(qid){currentQid=qid;ws.send(JSON.stringify({type:'get_question',team:myTeam,question_id:qid}));showScreen('screenDetail');}
+function backToList(){requestState();showScreen('screenList');}
+function renderDetail(q){if(!q)return;var card=document.getElementById('detailCard');
+if(q.solved){card.innerHTML='<div class="d-num">Q'+q.id+'</div><div class="d-title">'+q.title+'</div><div class="d-pts">⭐ '+q.points+'点</div><div class="d-question">'+q.question+'</div><div class="solved-badge">✅ 正解済み</div>';return;}
+var hh='';if(q.has_hint){var label=q.hint_used?'💡 ヒントを見る (表示済み)':'�� ヒントを見る (-0.5点)';hh='<div class="hint-area"><button class="hint-btn" id="hintBtn" onclick="useHint('+q.id+')">'+label+'</button><div class="hint-text" id="hintText" style="display:none"></div></div>';}
+card.innerHTML='<div class="d-num">Q'+q.id+'</div><div class="d-title">'+q.title+'</div><div class="d-pts">⭐ '+q.points+'点</div><div class="d-question">'+q.question+'</div>'+hh+'<div class="answer-area"><input class="answer-input" id="answerInput" placeholder="回答を入力..." autocomplete="off"><button class="submit-btn" id="submitBtn" onclick="submitAnswer('+q.id+')">送信</button></div><div id="resultArea"></div>';
+if(q.wrong_count>0)document.getElementById('resultArea').innerHTML='<div class="result-msg wrong">誤答 '+q.wrong_count+'回</div>';
+var inp=document.getElementById('answerInput');if(inp)inp.addEventListener('keypress',function(ev){if(ev.key==='Enter')submitAnswer(q.id);});}
+function submitAnswer(qid){var inp=document.getElementById('answerInput');if(!inp||!inp.value.trim())return;document.getElementById('submitBtn').disabled=true;ws.send(JSON.stringify({type:'answer',team:myTeam,question_id:qid,answer:inp.value.trim()}));}
+function showAnswerResult(data){var area=document.getElementById('resultArea');if(!area)return;
+if(data.correct){area.innerHTML='<div class="result-msg correct">🎉 '+data.message+' (+'+data.points_earned+'点)</div>';setTimeout(function(){requestState();showScreen('screenList');},2000);}
+else{area.innerHTML='<div class="result-msg wrong">'+data.message+'</div>';var btn=document.getElementById('submitBtn');if(btn)btn.disabled=false;var inp=document.getElementById('answerInput');if(inp){inp.value='';inp.focus();}}}
+function useHint(qid){ws.send(JSON.stringify({type:'use_hint',team:myTeam,question_id:qid}));}
+function showHintResult(data){if(!data.success)return;var ht=document.getElementById('hintText'),hb=document.getElementById('hintBtn');if(ht){ht.textContent='💡 '+data.hint;ht.style.display='block';}if(hb){hb.textContent='💡 ヒント表示済み';hb.onclick=null;}if(!data.already_used)showToast(data.message);}
+function showToast(msg){if(!msg)return;var t=document.getElementById('toast');t.textContent=msg;t.classList.remove('show');void t.offsetWidth;t.classList.add('show');setTimeout(function(){t.classList.remove('show');},4000);}
+connect();
+</script>
+</body>
+</html>
