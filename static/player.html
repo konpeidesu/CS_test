@@ -117,11 +117,9 @@ TEAMS.forEach(t=>{const b=document.createElement('button');b.className='team-btn
 function selectTeam(t){myTeam=t;document.getElementById('confirmTeamName').textContent=t;showScreen('screenConfirm');}
 function backToSelect(){myTeam=null;showScreen('screenSelect');}
 function confirmTeam(){document.getElementById('teamInfo').style.display='flex';document.getElementById('headerTeam').textContent='👥 '+myTeam;requestState();showScreen('screenWaiting');}
-function renderScoreBar(){const bar=document.getElementById('scoreBarTop');if(!bar)return;
-const sorted=Object.entries(allScores).sort((a,b)=>b[1]-a[1]);bar.innerHTML='';
-sorted.forEach(([team,score])=>{const ci=TEAMS.indexOf(team);const color=teamColors[ci]||'#fff';
-const isMy=team===myTeam?' my-team':'';
-bar.innerHTML+=`<div class="sb-item${isMy}"><span class="sb-dot" style="background:${color}"></span><span class="sb-name">${team}</span><span class="sb-val">${score.toFixed(1)}pt</span></div>`;});}
+function renderScoreBar(){const bar=document.getElementById('scoreBarTop');if(!bar||!gameState)return;
+const myScore=gameState.score||0;const ci=TEAMS.indexOf(myTeam);const color=teamColors[ci]||'#fff';
+bar.innerHTML=`<div class="sb-item my-team"><span class="sb-dot" style="background:${color}"></span><span class="sb-name">${myTeam}</span><span class="sb-val">${myScore.toFixed(1)}pt</span></div>`;}
 function renderList(){if(!gameState)return;
 if(Object.keys(allScores).length===0&&gameState.score!==undefined){allScores[myTeam]=gameState.score;}
 renderScoreBar();
@@ -144,8 +142,9 @@ function backToList(){requestState();showScreen('screenList');}
 function renderDetail(q){if(!q)return;const card=document.getElementById('detailCard');
 if(q.solved){card.innerHTML=`<div class="d-num">Q${q.id}</div><div class="d-title">${q.title}</div><div class="d-pts">⭐ ${q.points}点</div><div class="d-question">${q.question}</div><div class="solved-badge">✅ 正解済み</div>`;return;}
 let hh='';if(q.has_hint){const label=q.hint_used?'💡 ヒントを見る (表示済み)':'💡 ヒントを見る (-0.5点)';hh=`<div class="hint-area"><button class="hint-btn" id="hintBtn" onclick="useHint(${q.id})">${label}</button><div class="hint-text" id="hintText" style="display:none"></div></div>`;}
-let choicesHtml='';if(q.choices&&q.choices.length){choicesHtml='<div class="answer-area">'+q.choices.map(c=>`<button class="choice-btn" onclick="submitChoice(${q.id},this,'${c.replace(/'/g,"\\'")}')">` +c+'</button>').join('')+'</div>';}
+let choicesHtml='';if(q.choices&&q.choices.length){choicesHtml='<div class="answer-area" id="choicesArea"></div>';}
 card.innerHTML=`<div class="d-num">Q${q.id}</div><div class="d-title">${q.title}</div><div class="d-pts">⭐ ${q.points}点</div><div class="d-question">${q.question}</div>${hh}${choicesHtml}<div id="resultArea"></div>`;
+if(q.choices&&q.choices.length){const ca=document.getElementById('choicesArea');q.choices.forEach(c=>{const btn=document.createElement('button');btn.className='choice-btn';btn.textContent=c;btn.onclick=function(){submitChoice(q.id,btn,c);};ca.appendChild(btn);});}
 if(q.wrong_count>0)document.getElementById('resultArea').innerHTML=`<div class="result-msg wrong">誤答 ${q.wrong_count}回</div>`;}
 function submitChoice(qid,btn,answer){const btns=document.querySelectorAll('.choice-btn');btns.forEach(b=>b.disabled=true);btn.classList.add('selected');ws.send(JSON.stringify({type:'answer',team:myTeam,question_id:qid,answer:answer}));}
 function submitAnswer(qid){const inp=document.getElementById('answerInput');if(!inp||!inp.value.trim())return;document.getElementById('submitBtn').disabled=true;ws.send(JSON.stringify({type:'answer',team:myTeam,question_id:qid,answer:inp.value.trim()}));}
