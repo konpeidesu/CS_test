@@ -7,22 +7,18 @@ on:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy to VM
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.ESXI_HOST }}
-          username: ${{ secrets.ESXI_SSH_USER }}
-          key: ${{ secrets.ESXI_SSH_KEY }}
-          script: |
-            if [ ! -d "/home/kawai/CS_test" ]; then
-              git clone https://github.com/konpeidesu/CS_test.git /home/kawai/CS_test
-            fi
-            cd /home/kawai/CS_test
-            git pull origin main
-            docker compose up -d --build
+      - name: Copy repository to app directory
+        run: |
+          mkdir -p /home/kawai/CS_test
+          rsync -av --delete ./ /home/kawai/CS_test/
+
+      - name: Deploy with Docker Compose
+        run: |
+          cd /home/kawai/CS_test
+          docker compose up -d --build
