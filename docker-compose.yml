@@ -1,5 +1,8 @@
 services:
-  app:
+   app:
     build: .
     ports:
-      - "80:8000"
+      - "172.22.187.44:80:8000"
+    volumes:
+      - ./static:/app/static
+    restart: always
