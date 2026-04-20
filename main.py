@@ -165,7 +165,11 @@ class QuizGame:
             points = self.question_points_for_team(team, q["id"])
             is_bonus = q["id"] in self.comeback_bonus.get(team, {})
             qs.append({"id": q["id"], "title": q["title"], "points": points, "base_points": q["points"], "is_bonus": is_bonus, "has_hint": bool(q.get("hint")), "solved": st.get("solved", False), "hint_used": st.get("hint_used", False), "wrong_count": st.get("wrong_count", 0)})
-        return {"team": team, "score": self.teams[team], "questions": qs, "game_started": self.game_state == "running", "game_state": self.game_state}
+        remaining = None
+        if self.game_state == "running" and self.game_start_time:
+            elapsed = time.time() - self.game_start_time
+            remaining = max(0, self.time_limit - elapsed)
+        return {"team": team, "score": self.teams[team], "teams": {t: self.teams[t] for t in TEAMS}, "questions": qs, "game_started": self.game_state == "running", "game_state": self.game_state, "remaining_seconds": remaining}
 
     def get_question_detail(self, question_id, team):
         q = next((qn for qn in self.questions if qn["id"] == question_id), None)

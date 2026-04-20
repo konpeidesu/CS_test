@@ -101,13 +101,14 @@ body{font-family:'Segoe UI','Hiragino Sans',sans-serif;background:linear-gradien
 const TEAMS=["A-1","A-2","B-1","B-2","C-1","C-2"];
 const teamColors=['#f5576c','#4facfe','#43e97b','#fee140','#a18cd1','#fccb90'];
 let ws,myTeam=null,gameState=null,currentQid=null,allScores={};
+const SCORE_HIDE_THRESHOLD_SECONDS=180;
 function connect(){const p=location.protocol==='https:'?'wss:':'ws:';ws=new WebSocket(`${p}//${location.host}/ws/player`);ws.onmessage=handleMessage;ws.onclose=()=>setTimeout(connect,2000);}
 function handleMessage(e){const msg=JSON.parse(e.data);
-if(msg.type==='team_state'){gameState=msg.data;renderList();updateHeader();if(gameState.game_started&&document.getElementById('screenWaiting').classList.contains('active'))showScreen('screenList');}
+if(msg.type==='team_state'){gameState=msg.data;if(msg.data.teams)allScores=msg.data.teams;renderList();updateHeader();if(gameState.game_started&&document.getElementById('screenWaiting').classList.contains('active'))showScreen('screenList');}
 else if(msg.type==='question_detail')renderDetail(msg.data);
 else if(msg.type==='answer_result')showAnswerResult(msg.data);
 else if(msg.type==='hint_result')showHint(msg.data);
-else if(msg.type==='scores_update'){allScores=msg.data;if(gameState&&myTeam){gameState.score=msg.data[myTeam]||0;updateHeader();renderScoreBar();}}
+else if(msg.type==='scores_update'){allScores=msg.data;if(gameState&&myTeam){gameState.score=msg.data[myTeam]||0;updateHeader();requestState();renderScoreBar();}}
 else if(msg.type==='game_started'){if(myTeam){requestState();showScreen('screenList');}}
 else if(msg.type==='game_reset'){myTeam=null;gameState=null;allScores={};showScreen('screenSelect');document.getElementById('teamInfo').style.display='none';}
 else if(msg.type==='comeback_bonus_applied'){if(myTeam){requestState();}if(msg.data&&msg.data.some(b=>b.team===myTeam))showToast('⚡ 逆転ボーナス発動');}
@@ -121,8 +122,10 @@ function selectTeam(t){myTeam=t;document.getElementById('confirmTeamName').textC
 function backToSelect(){myTeam=null;showScreen('screenSelect');}
 function confirmTeam(){document.getElementById('teamInfo').style.display='flex';document.getElementById('headerTeam').textContent='👥 '+myTeam;requestState();showScreen('screenWaiting');}
 function renderScoreBar(){const bar=document.getElementById('scoreBarTop');if(!bar||!gameState)return;
-const myScore=gameState.score||0;const ci=TEAMS.indexOf(myTeam);const color=teamColors[ci]||'#fff';
-bar.innerHTML=`<div class="sb-item my-team"><span class="sb-dot" style="background:${color}"></span><span class="sb-name">${myTeam}</span><span class="sb-val">${myScore.toFixed(1)}pt</span></div>`;}
+const hideOthers=gameState.game_started&&gameState.remaining_seconds!==null&&gameState.remaining_seconds<SCORE_HIDE_THRESHOLD_SECONDS;
+const scores=hideOthers?{[myTeam]:gameState.score||0}:(Object.keys(allScores).length?allScores:{[myTeam]:gameState.score||0});
+bar.innerHTML='';
+TEAMS.filter(t=>scores[t]!==undefined).forEach(t=>{const ci=TEAMS.indexOf(t);const color=teamColors[ci]||'#fff';const item=document.createElement('div');item.className='sb-item'+(t===myTeam?' my-team':'');item.innerHTML=`<span class="sb-dot" style="background:${color}"></span><span class="sb-name">${t}</span><span class="sb-val">${Number(scores[t]).toFixed(1)}pt</span>`;bar.appendChild(item);});}
 function formatPointValue(points){const pts=Number(points);return Number.isInteger(pts)?String(pts):pts.toFixed(1);}
 function formatPoints(q){const label=formatPointValue(q.points);return q.is_bonus?`⚡ ${label}点（ボーナス）`:`⭐ ${label}点`;}
 function renderList(){if(!gameState)return;
