@@ -59,9 +59,9 @@ body{font-family:'Segoe UI','Hiragino Sans',sans-serif;background:linear-gradien
 <div class="header"><h1>🎯 社内クイズ大会</h1><div class="timer" id="headerTimer" style="display:none">20:00</div></div>
 <div class="main">
 <div class="waiting" id="waitingScreen"><div class="emoji">🎮</div><h2>クイズ大会</h2><p>まもなく開始します...</p></div>
-<div class="score-main" id="scoreScreen" style="display:none"><div id="lastMinOverlay" class="last-min-overlay" style="display:none">🔥 残り3分！順位・得点・チーム名 非公開！ 🔥</div><div class="score-title" id="scoreTitle">🏆 スコアボード</div><div class="score-cards" id="scoreCards"></div></div>
+<div class="score-main" id="scoreScreen" style="display:none"><div id="lastMinOverlay" class="last-min-overlay" style="display:none"></div><div class="score-title" id="scoreTitle">🏆 スコアボード</div><div class="score-cards" id="scoreCards"></div></div>
 </div>
-<div class="urgent-countdown" id="urgentCountdown"><div class="urgent-countdown-inner" id="urgentCountdownText">残り 02:59</div></div>
+<div class="urgent-countdown" id="urgentCountdown"><div class="urgent-countdown-inner" id="urgentCountdownText">02:59</div></div>
 <div class="toast" id="toast"></div>
 <script>
 const TEAMS=["A-1","A-2","B-1","B-2","C-1","C-2"];
@@ -94,7 +94,7 @@ function updateTimer(sec){const el=document.getElementById('headerTimer');const 
 el.textContent=`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 el.className='timer';if(sec<HIDE_SCORE_THRESHOLD_SECONDS)el.classList.add('danger');else if(sec<=300)el.classList.add('warning');
 const urgent=document.getElementById('urgentCountdown');const urgentText=document.getElementById('urgentCountdownText');
-if(sec<HIDE_SCORE_THRESHOLD_SECONDS&&currentGameState==='running'){urgent.classList.add('active');urgentText.textContent=`残り ${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;}else{urgent.classList.remove('active');}}
+if(sec<HIDE_SCORE_THRESHOLD_SECONDS&&currentGameState==='running'){urgent.classList.add('active');urgentText.textContent=`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;}else{urgent.classList.remove('active');}}
 function renderScores(oldScores){if(!adminState)return;const container=document.getElementById('scoreCards');
 const hideScores=isLastMinute||currentGameState==='ended';
 const sorted=hideScores?TEAMS.map(t=>[t,adminState.teams[t]||0]):Object.entries(adminState.teams).sort((a,b)=>b[1]-a[1]);
