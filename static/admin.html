@@ -38,6 +38,8 @@ body{font-family:'Segoe UI','Hiragino Sans',sans-serif;background:linear-gradien
 .score-val{color:#ffd700;font-weight:bold;font-size:1.1em}
 .progress-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;font-size:.7em;text-align:center}
 .progress-grid .ph{color:#aaa;font-weight:bold;padding:4px}
+.progress-grid .q-head{line-height:1.25}
+.progress-grid .q-points{display:block;color:#ffd700;font-size:.85em;font-weight:normal;margin-top:2px}
 .progress-grid .pc{padding:3px;border-radius:4px}
 .pc-solved{background:rgba(46,204,113,.3);color:#2ecc71}
 .pc-wrong{background:rgba(231,76,60,.2);color:#e74c3c}
@@ -82,7 +84,7 @@ tbody.innerHTML+=`<tr><td>${team}</td><td class="score-val">${score.toFixed(1)}<
 function renderProgress(){if(!state)return;const area=document.getElementById('progressArea');
 let html='<div class="progress-grid"><div class="ph">Q#</div>';
 const teams=Object.keys(state.teams);teams.forEach(t=>{html+=`<div class="ph">${t}</div>`;});
-for(let i=1;i<=30;i++){html+=`<div class="ph">Q${i}</div>`;teams.forEach(t=>{const s=state.team_status[t]?.[String(i)];
+for(let i=1;i<=30;i++){const q=state.questions?.find(q=>q.id===i);const pts=q?`${q.points}点`:'';html+=`<div class="ph q-head">Q${i}<span class="q-points">${pts}</span></div>`;teams.forEach(t=>{const s=state.team_status[t]?.[String(i)];
 if(!s)html+='<div class="pc pc-none">-</div>';
 else if(s.solved)html+=`<div class="pc pc-solved">✅</div>`;
 else if(s.wrong_count>0)html+=`<div class="pc pc-wrong">❌${s.wrong_count}</div>`;
