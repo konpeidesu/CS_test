@@ -5,6 +5,7 @@ import json
 import asyncio
 import random
 import time
+import math
 
 app = FastAPI()
 
@@ -58,10 +59,50 @@ class QuizGame:
         self.game_state: str = "waiting"  # waiting / running / ended / result
         self.game_start_time: Optional[float] = None
         self.time_limit: int = 1200  # 20 minutes
+        self.comeback_bonus_applied: bool = False
+        self.comeback_bonus: Dict[str, Dict[int, float]] = {t: {} for t in TEAMS}
 
     @property
     def game_started(self):
         return self.game_state == "running"
+
+    def question_points_for_team(self, team, question_id):
+        bonus_points = self.comeback_bonus.get(team, {}).get(question_id)
+        if bonus_points is not None:
+            return bonus_points
+        q = next((qn for qn in self.questions if qn["id"] == question_id), None)
+        return q["points"] if q else 0
+
+    def apply_comeback_bonus(self):
+        if self.comeback_bonus_applied:
+            return []
+        self.comeback_bonus_applied = True
+        top_score = max(self.teams.values()) if self.teams else 0
+        applied = []
+        for team, score in self.teams.items():
+            gap = top_score - score
+            if gap < 10:
+                continue
+            unanswered = [
+                q for q in self.questions
+                if not self.team_status[team].get(q["id"], {}).get("solved", False)
+            ]
+            if not unanswered:
+                continue
+            target_count = max(1, math.floor(0.3 * len(unanswered)))
+            target_count = min(target_count, len(unanswered))
+            final_points = (gap + 3) / target_count
+            selected = random.sample(unanswered, target_count)
+            for q in selected:
+                self.comeback_bonus[team][q["id"]] = final_points
+            applied.append({
+                "team": team,
+                "gap": gap,
+                "count": target_count,
+                "points": final_points,
+                "question_ids": [q["id"] for q in selected],
+            })
+        return applied
 
     def submit_answer(self, team, question_id, answer):
         if self.game_state != "running":
@@ -76,8 +117,9 @@ class QuizGame:
             return {"success": False, "message": "既に正解済みです"}
         correct = answer.strip() == q["answer"].strip()
         if correct:
+            earned_points = self.question_points_for_team(team, question_id)
             status["solved"] = True
-            self.teams[team] += q["points"]
+            self.teams[team] += earned_points
             self.teams[team] = max(0, self.teams[team])
             bonus_msg = None
             penalty_msg = None
@@ -91,7 +133,7 @@ class QuizGame:
                 self.teams[penalty_target] = max(0, self.teams[penalty_target] - 1.0)
                 penalty_msg = f"ランダム減点: {penalty_target} が -1点！"
             self.team_status[team][question_id] = status
-            return {"success": True, "correct": True, "message": "正解！", "points_earned": q["points"], "bonus_msg": bonus_msg, "penalty_msg": penalty_msg}
+            return {"success": True, "correct": True, "message": "正解！", "points_earned": earned_points, "bonus_msg": bonus_msg, "penalty_msg": penalty_msg}
         else:
             status["wrong_count"] += 1
             self.teams[team] -= 0.5
@@ -120,7 +162,9 @@ class QuizGame:
         qs = []
         for q in self.questions:
             st = self.team_status[team].get(q["id"], {"solved": False, "hint_used": False, "wrong_count": 0})
-            qs.append({"id": q["id"], "title": q["title"], "points": q["points"], "has_hint": bool(q.get("hint")), "solved": st.get("solved", False), "hint_used": st.get("hint_used", False), "wrong_count": st.get("wrong_count", 0)})
+            points = self.question_points_for_team(team, q["id"])
+            is_bonus = q["id"] in self.comeback_bonus.get(team, {})
+            qs.append({"id": q["id"], "title": q["title"], "points": points, "base_points": q["points"], "is_bonus": is_bonus, "has_hint": bool(q.get("hint")), "solved": st.get("solved", False), "hint_used": st.get("hint_used", False), "wrong_count": st.get("wrong_count", 0)})
         return {"team": team, "score": self.teams[team], "questions": qs, "game_started": self.game_state == "running", "game_state": self.game_state}
 
     def get_question_detail(self, question_id, team):
@@ -130,14 +174,16 @@ class QuizGame:
         st = self.team_status[team].get(question_id, {"solved": False, "hint_used": False, "wrong_count": 0})
         choices = list(q.get("choices", []))
         random.shuffle(choices)
-        return {"id": q["id"], "title": q["title"], "question": q["question"], "points": q["points"], "has_hint": bool(q.get("hint")), "solved": st.get("solved", False), "hint_used": st.get("hint_used", False), "wrong_count": st.get("wrong_count", 0), "choices": choices}
+        points = self.question_points_for_team(team, q["id"])
+        is_bonus = q["id"] in self.comeback_bonus.get(team, {})
+        return {"id": q["id"], "title": q["title"], "question": q["question"], "points": points, "base_points": q["points"], "is_bonus": is_bonus, "has_hint": bool(q.get("hint")), "solved": st.get("solved", False), "hint_used": st.get("hint_used", False), "wrong_count": st.get("wrong_count", 0), "choices": choices}
 
     def get_admin_state(self):
         remaining = None
         if self.game_state == "running" and self.game_start_time:
             elapsed = time.time() - self.game_start_time
             remaining = max(0, self.time_limit - elapsed)
-        return {"teams": {t: self.teams[t] for t in TEAMS}, "team_status": {t: {str(qid): s for qid, s in statuses.items()} for t, statuses in self.team_status.items()}, "first_solver": {str(k): v for k, v in self.first_solver.items()}, "random_penalty": {str(k): v for k, v in self.random_penalty.items()}, "questions": self.questions, "game_started": self.game_state == "running", "game_state": self.game_state, "remaining_seconds": remaining, "time_limit_minutes": self.time_limit // 60}
+        return {"teams": {t: self.teams[t] for t in TEAMS}, "team_status": {t: {str(qid): s for qid, s in statuses.items()} for t, statuses in self.team_status.items()}, "first_solver": {str(k): v for k, v in self.first_solver.items()}, "random_penalty": {str(k): v for k, v in self.random_penalty.items()}, "questions": self.questions, "comeback_bonus_applied": self.comeback_bonus_applied, "comeback_bonus": {t: {str(qid): pts for qid, pts in bonuses.items()} for t, bonuses in self.comeback_bonus.items()}, "game_started": self.game_state == "running", "game_state": self.game_state, "remaining_seconds": remaining, "time_limit_minutes": self.time_limit // 60}
 
     def reset(self):
         conns = self.connections
@@ -176,6 +222,27 @@ async def broadcast_event(event):
             await ws.send_text(data)
         except Exception:
             pass
+
+
+async def broadcast_bonus_applied(applied):
+    data = json.dumps({"type": "comeback_bonus_applied", "data": applied}, ensure_ascii=False)
+    for ws in game.connections + game.admin_connections:
+        try:
+            await ws.send_text(data)
+        except Exception:
+            pass
+
+
+async def trigger_comeback_bonus_at_deadline(started_at, time_limit):
+    await asyncio.sleep(max(0, time_limit - 180 + 0.1))
+    if game.game_state != "running" or game.game_start_time != started_at:
+        return
+    applied = game.apply_comeback_bonus()
+    if applied:
+        teams = ", ".join(item["team"] for item in applied)
+        await broadcast_event({"message": f"Comeback bonus: {teams}"})
+    await broadcast_bonus_applied(applied)
+    await broadcast_admin()
 
 
 @app.websocket("/ws/player")
@@ -229,6 +296,7 @@ async def admin_ws(websocket: WebSocket):
                 game.time_limit = max(1, min(minutes, 999)) * 60
                 game.game_state = "running"
                 game.game_start_time = time.time()
+                asyncio.create_task(trigger_comeback_bonus_at_deadline(game.game_start_time, game.time_limit))
                 await broadcast_event({"message": "ゲームが開始されました！"})
                 await broadcast_admin()
                 for ws in game.connections:

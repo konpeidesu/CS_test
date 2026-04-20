@@ -51,8 +51,10 @@ body{font-family:'Segoe UI','Hiragino Sans',sans-serif;background:linear-gradien
 .q-card.pts-3.solved{border-color:#2ecc71;background:rgba(46,204,113,.15)}
 .q-card.pts-4{background:rgba(245,87,108,.15);border:2px solid rgba(245,87,108,.4)}
 .q-card.pts-4.solved{border-color:#2ecc71;background:rgba(46,204,113,.15)}
+.q-card.bonus{background:linear-gradient(135deg,rgba(255,59,32,.28),rgba(255,215,0,.18));border:2px solid #ffd700;box-shadow:0 0 18px rgba(255,215,0,.25)}
 .q-card .q-num{font-size:.8em;color:#aaa}.q-card .q-title{font-size:1em;font-weight:bold;margin:6px 0}
 .q-card .q-pts{font-size:.85em;color:#ffd700}
+.q-card.bonus .q-pts,.d-pts.bonus{color:#ff5a36;font-weight:bold;text-shadow:0 0 10px rgba(255,90,54,.45)}
 .q-card .q-status{font-size:.75em;margin-top:6px;padding:3px 8px;border-radius:10px;display:inline-block}
 .status-unsolved{background:rgba(255,255,255,.1);color:#aaa}
 .status-solved{background:rgba(46,204,113,.3);color:#2ecc71}
@@ -108,6 +110,7 @@ else if(msg.type==='hint_result')showHint(msg.data);
 else if(msg.type==='scores_update'){allScores=msg.data;if(gameState&&myTeam){gameState.score=msg.data[myTeam]||0;updateHeader();renderScoreBar();}}
 else if(msg.type==='game_started'){if(myTeam){requestState();showScreen('screenList');}}
 else if(msg.type==='game_reset'){myTeam=null;gameState=null;allScores={};showScreen('screenSelect');document.getElementById('teamInfo').style.display='none';}
+else if(msg.type==='comeback_bonus_applied'){if(myTeam){requestState();}if(msg.data&&msg.data.some(b=>b.team===myTeam))showToast('⚡ 逆転ボーナス発動');}
 else if(msg.type==='event'&&msg.data){const parts=[msg.data.bonus_msg,msg.data.penalty_msg,msg.data.message].filter(Boolean);if(parts.length)showToast(parts.join(' / '));}}
 function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');}
 function updateHeader(){if(!gameState)return;document.getElementById('headerScore').textContent=gameState.score.toFixed(1)+' pt';}
@@ -120,36 +123,39 @@ function confirmTeam(){document.getElementById('teamInfo').style.display='flex';
 function renderScoreBar(){const bar=document.getElementById('scoreBarTop');if(!bar||!gameState)return;
 const myScore=gameState.score||0;const ci=TEAMS.indexOf(myTeam);const color=teamColors[ci]||'#fff';
 bar.innerHTML=`<div class="sb-item my-team"><span class="sb-dot" style="background:${color}"></span><span class="sb-name">${myTeam}</span><span class="sb-val">${myScore.toFixed(1)}pt</span></div>`;}
+function formatPointValue(points){const pts=Number(points);return Number.isInteger(pts)?String(pts):pts.toFixed(1);}
+function formatPoints(q){const label=formatPointValue(q.points);return q.is_bonus?`⚡ ${label}点（ボーナス）`:`⭐ ${label}点`;}
 function renderList(){if(!gameState)return;
 if(Object.keys(allScores).length===0&&gameState.score!==undefined){allScores[myTeam]=gameState.score;}
 renderScoreBar();
 const area=document.getElementById('qListArea');area.innerHTML='';
 const groups=[{pts:2,label:'⭐⭐ 2点問題（基本）',cls:'section-2pt'},{pts:3,label:'⭐⭐⭐ 3点問題（応用）',cls:'section-3pt'},{pts:4,label:'⭐⭐⭐⭐ 4点問題（難問）',cls:'section-4pt'}];
-groups.forEach(g=>{const qs=gameState.questions.filter(q=>q.points===g.pts);if(!qs.length)return;
+groups.forEach(g=>{const qs=gameState.questions.filter(q=>(q.base_points||q.points)===g.pts);if(!qs.length)return;
 const sh=document.createElement('div');sh.className='section-header '+g.cls;sh.textContent=g.label;area.appendChild(sh);
 const gridDiv=document.createElement('div');gridDiv.className='q-grid';
-qs.forEach(q=>{const card=document.createElement('div');card.className='q-card pts-'+q.points+(q.solved?' solved':'');
+qs.forEach(q=>{const basePts=q.base_points||q.points;const card=document.createElement('div');card.className='q-card pts-'+basePts+(q.solved?' solved':'')+(q.is_bonus?' bonus':'');
 let st='未回答',sc='status-unsolved';
 if(q.solved){st='✅ 正解済み';sc='status-solved';}
 else if(q.wrong_count>0&&q.hint_used){st=`❌×${q.wrong_count} 💡済`;sc='status-wrong';}
 else if(q.wrong_count>0){st=`❌×${q.wrong_count}`;sc='status-wrong';}
 else if(q.hint_used){st='💡 ヒント済';sc='status-hint';}
-card.innerHTML=`<div class="q-num">Q${q.id}</div><div class="q-title">${q.title}</div><div class="q-pts">⭐ ${q.points}点</div><div class="q-status ${sc}">${st}</div>`;
+card.innerHTML=`<div class="q-num">Q${q.id}</div><div class="q-title">${q.title}</div><div class="q-pts">${formatPoints(q)}</div><div class="q-status ${sc}">${st}</div>`;
 card.onclick=()=>openQuestion(q.id);gridDiv.appendChild(card);});
 area.appendChild(gridDiv);});}
 function openQuestion(qid){currentQid=qid;ws.send(JSON.stringify({type:'get_question',team:myTeam,question_id:qid}));showScreen('screenDetail');}
 function backToList(){requestState();showScreen('screenList');}
 function renderDetail(q){if(!q)return;const card=document.getElementById('detailCard');
-if(q.solved){card.innerHTML=`<div class="d-num">Q${q.id}</div><div class="d-title">${q.title}</div><div class="d-pts">⭐ ${q.points}点</div><div class="d-question">${q.question}</div><div class="solved-badge">✅ 正解済み</div>`;return;}
+const ptsClass=q.is_bonus?'d-pts bonus':'d-pts';
+if(q.solved){card.innerHTML=`<div class="d-num">Q${q.id}</div><div class="d-title">${q.title}</div><div class="${ptsClass}">${formatPoints(q)}</div><div class="d-question">${q.question}</div><div class="solved-badge">✅ 正解済み</div>`;return;}
 let hh='';if(q.has_hint){const label=q.hint_used?'💡 ヒントを見る (表示済み)':'💡 ヒントを見る (-1点)';hh=`<div class="hint-area"><button class="hint-btn" id="hintBtn" onclick="useHint(${q.id})">${label}</button><div class="hint-text" id="hintText" style="display:none"></div></div>`;}
 let choicesHtml='';if(q.choices&&q.choices.length){choicesHtml='<div class="answer-area" id="choicesArea"></div>';}
-card.innerHTML=`<div class="d-num">Q${q.id}</div><div class="d-title">${q.title}</div><div class="d-pts">⭐ ${q.points}点</div><div class="d-question">${q.question}</div>${hh}${choicesHtml}<div id="resultArea"></div>`;
+card.innerHTML=`<div class="d-num">Q${q.id}</div><div class="d-title">${q.title}</div><div class="${ptsClass}">${formatPoints(q)}</div><div class="d-question">${q.question}</div>${hh}${choicesHtml}<div id="resultArea"></div>`;
 if(q.choices&&q.choices.length){const ca=document.getElementById('choicesArea');q.choices.forEach(c=>{const btn=document.createElement('button');btn.className='choice-btn';btn.textContent=c;btn.onclick=function(){submitChoice(q.id,btn,c);};ca.appendChild(btn);});}
 if(q.wrong_count>0)document.getElementById('resultArea').innerHTML=`<div class="result-msg wrong">誤答 ${q.wrong_count}回</div>`;}
 function submitChoice(qid,btn,answer){const btns=document.querySelectorAll('.choice-btn');btns.forEach(b=>b.disabled=true);btn.classList.add('selected');ws.send(JSON.stringify({type:'answer',team:myTeam,question_id:qid,answer:answer}));}
 function submitAnswer(qid){const inp=document.getElementById('answerInput');if(!inp||!inp.value.trim())return;document.getElementById('submitBtn').disabled=true;ws.send(JSON.stringify({type:'answer',team:myTeam,question_id:qid,answer:inp.value.trim()}));}
 function showAnswerResult(data){const area=document.getElementById('resultArea');if(!area)return;
-if(data.correct){area.innerHTML=`<div class="result-msg correct">🎉 ${data.message} (+${data.points_earned}点)</div>`;setTimeout(()=>{requestState();showScreen('screenList');},2000);}
+if(data.correct){area.innerHTML=`<div class="result-msg correct">🎉 ${data.message} (+${formatPointValue(data.points_earned)}点)</div>`;setTimeout(()=>{requestState();showScreen('screenList');},2000);}
 else{area.innerHTML=`<div class="result-msg wrong">${data.message}</div>`;const btns=document.querySelectorAll('.choice-btn');btns.forEach(b=>{b.disabled=false;b.classList.remove('selected');});}}
 function useHint(qid){ws.send(JSON.stringify({type:'use_hint',team:myTeam,question_id:qid}));}
 function showHint(data){if(!data.success)return;const ht=document.getElementById('hintText'),hb=document.getElementById('hintBtn');if(ht){ht.textContent='💡 '+data.hint;ht.style.display='block';}if(hb){hb.textContent='💡 ヒント表示済み';hb.onclick=null;}if(!data.already_used)showToast(data.message);}
