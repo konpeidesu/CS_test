@@ -109,10 +109,10 @@ class QuizGame:
         hint_text = q["hint"]
         if not status["hint_used"]:
             status["hint_used"] = True
-            self.teams[team] -= 0.5
+            self.teams[team] -= 1.0
             self.teams[team] = max(0, self.teams[team])
             self.team_status[team][question_id] = status
-            return {"success": True, "hint": hint_text, "message": "ヒント表示 (-0.5点)", "already_used": False}
+            return {"success": True, "hint": hint_text, "message": "ヒント表示 (-1点)", "already_used": False}
         else:
             return {"success": True, "hint": hint_text, "message": "ヒント表示済み", "already_used": True}
 
@@ -137,7 +137,7 @@ class QuizGame:
         if self.game_state == "running" and self.game_start_time:
             elapsed = time.time() - self.game_start_time
             remaining = max(0, self.time_limit - elapsed)
-        return {"teams": {t: self.teams[t] for t in TEAMS}, "team_status": {t: {str(qid): s for qid, s in statuses.items()} for t, statuses in self.team_status.items()}, "first_solver": {str(k): v for k, v in self.first_solver.items()}, "random_penalty": {str(k): v for k, v in self.random_penalty.items()}, "questions": self.questions, "game_started": self.game_state == "running", "game_state": self.game_state, "remaining_seconds": remaining}
+        return {"teams": {t: self.teams[t] for t in TEAMS}, "team_status": {t: {str(qid): s for qid, s in statuses.items()} for t, statuses in self.team_status.items()}, "first_solver": {str(k): v for k, v in self.first_solver.items()}, "random_penalty": {str(k): v for k, v in self.random_penalty.items()}, "questions": self.questions, "game_started": self.game_state == "running", "game_state": self.game_state, "remaining_seconds": remaining, "time_limit_minutes": self.time_limit // 60}
 
     def reset(self):
         conns = self.connections
@@ -221,6 +221,12 @@ async def admin_ws(websocket: WebSocket):
             data = await websocket.receive_text()
             msg = json.loads(data)
             if msg["type"] == "start_game":
+                minutes = msg.get("time_limit_minutes", game.time_limit // 60)
+                try:
+                    minutes = int(minutes)
+                except (TypeError, ValueError):
+                    minutes = 20
+                game.time_limit = max(1, min(minutes, 999)) * 60
                 game.game_state = "running"
                 game.game_start_time = time.time()
                 await broadcast_event({"message": "ゲームが開始されました！"})

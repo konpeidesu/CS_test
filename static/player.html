@@ -141,7 +141,7 @@ function openQuestion(qid){currentQid=qid;ws.send(JSON.stringify({type:'get_ques
 function backToList(){requestState();showScreen('screenList');}
 function renderDetail(q){if(!q)return;const card=document.getElementById('detailCard');
 if(q.solved){card.innerHTML=`<div class="d-num">Q${q.id}</div><div class="d-title">${q.title}</div><div class="d-pts">⭐ ${q.points}点</div><div class="d-question">${q.question}</div><div class="solved-badge">✅ 正解済み</div>`;return;}
-let hh='';if(q.has_hint){const label=q.hint_used?'💡 ヒントを見る (表示済み)':'💡 ヒントを見る (-0.5点)';hh=`<div class="hint-area"><button class="hint-btn" id="hintBtn" onclick="useHint(${q.id})">${label}</button><div class="hint-text" id="hintText" style="display:none"></div></div>`;}
+let hh='';if(q.has_hint){const label=q.hint_used?'💡 ヒントを見る (表示済み)':'💡 ヒントを見る (-1点)';hh=`<div class="hint-area"><button class="hint-btn" id="hintBtn" onclick="useHint(${q.id})">${label}</button><div class="hint-text" id="hintText" style="display:none"></div></div>`;}
 let choicesHtml='';if(q.choices&&q.choices.length){choicesHtml='<div class="answer-area" id="choicesArea"></div>';}
 card.innerHTML=`<div class="d-num">Q${q.id}</div><div class="d-title">${q.title}</div><div class="d-pts">⭐ ${q.points}点</div><div class="d-question">${q.question}</div>${hh}${choicesHtml}<div id="resultArea"></div>`;
 if(q.choices&&q.choices.length){const ca=document.getElementById('choicesArea');q.choices.forEach(c=>{const btn=document.createElement('button');btn.className='choice-btn';btn.textContent=c;btn.onclick=function(){submitChoice(q.id,btn,c);};ca.appendChild(btn);});}
