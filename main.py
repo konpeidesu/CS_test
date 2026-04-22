@@ -82,11 +82,13 @@ class QuizGame:
         return 0 if self.game_state == "ended" else None
 
     def question_points_for_team(self, team, question_id):
+        override_points = self.comeback_bonus.get(team, {}).get(question_id)
+        if override_points is not None:
+            return override_points
         q = next((qn for qn in self.questions if qn["id"] == question_id), None)
         if not q:
             return 0
-        bonus_points = self.comeback_bonus.get(team, {}).get(question_id, 0)
-        return q["points"] + bonus_points
+        return q["points"]
 
     def apply_comeback_bonus(self):
         if self.comeback_bonus_applied:
@@ -106,15 +108,15 @@ class QuizGame:
                 continue
             target_count = max(1, math.floor(0.3 * len(unanswered)))
             target_count = min(target_count, len(unanswered))
-            bonus_points = (gap + 3) / target_count
+            final_points = max(0, gap - 3) / target_count
             selected = random.sample(unanswered, target_count)
             for q in selected:
-                self.comeback_bonus[team][q["id"]] = bonus_points
+                self.comeback_bonus[team][q["id"]] = final_points
             applied.append({
                 "team": team,
                 "gap": gap,
                 "count": target_count,
-                "points": bonus_points,
+                "points": final_points,
                 "question_ids": [q["id"] for q in selected],
             })
         return applied
