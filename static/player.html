@@ -85,6 +85,13 @@ body{font-family:'Segoe UI','Hiragino Sans',sans-serif;background:linear-gradien
 .waiting-box .emoji{font-size:4em;animation:bounce 2s infinite}
 @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-15px)}}
 .waiting-box h2{font-size:1.8em;margin:20px 0}.waiting-box p{color:#aaa;font-size:1.1em}
+.q-card.disabled{opacity:.45;cursor:default;filter:grayscale(.2)}
+.q-card.disabled:hover{transform:none;filter:grayscale(.2)}
+.end-overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:180;padding:24px;background:radial-gradient(circle,rgba(255,94,58,.24),rgba(0,0,0,.62) 58%,rgba(0,0,0,.9))}
+.end-overlay.active{display:flex}
+.end-overlay .end-box{width:min(92vw,720px);padding:44px 28px;border-radius:28px;border:4px solid rgba(255,112,67,.85);background:rgba(20,10,10,.92);text-align:center;box-shadow:0 0 60px rgba(255,87,34,.35)}
+.end-overlay .end-title{font-size:clamp(3rem,12vw,7rem);font-weight:900;letter-spacing:.08em;color:#ff6b4a;text-shadow:0 0 24px rgba(255,107,74,.75)}
+.end-overlay .end-sub{margin-top:14px;font-size:clamp(1rem,3.5vw,1.6rem);color:#ffd2c8}
 </style>
 </head>
 <body>
@@ -97,25 +104,33 @@ body{font-family:'Segoe UI','Hiragino Sans',sans-serif;background:linear-gradien
 <div class="screen" id="screenDetail"><div class="detail-back" onclick="backToList()">← 問題一覧に戻る</div><div class="detail-card" id="detailCard"></div></div>
 </div>
 <div class="toast" id="toast"></div>
+<div class="end-overlay" id="endOverlay"><div class="end-box"><div class="end-title">終了</div><div class="end-sub">制限時間です。回答できません。</div></div></div>
 <script>
 const TEAMS=["A-1","A-2","B-1","B-2","C-1","C-2"];
 const teamColors=['#f5576c','#4facfe','#43e97b','#fee140','#a18cd1','#fccb90'];
-let ws,myTeam=null,gameState=null,currentQid=null,allScores={};
+let ws,myTeam=null,gameState=null,currentQid=null,allScores={},playerTimerInterval=null;
 const SCORE_HIDE_THRESHOLD_SECONDS=180;
 function connect(){const p=location.protocol==='https:'?'wss:':'ws:';ws=new WebSocket(`${p}//${location.host}/ws/player`);ws.onmessage=handleMessage;ws.onclose=()=>setTimeout(connect,2000);}
 function handleMessage(e){const msg=JSON.parse(e.data);
-if(msg.type==='team_state'){gameState=msg.data;if(msg.data.teams)allScores=msg.data.teams;renderList();updateHeader();if(gameState.game_started&&document.getElementById('screenWaiting').classList.contains('active'))showScreen('screenList');}
+if(msg.type==='team_state'){gameState=msg.data;if(msg.data.teams)allScores=msg.data.teams;syncPlayerTimer();renderList();updateHeader();updateEndOverlay();if(isAnswerLocked()&&document.getElementById('screenDetail').classList.contains('active'))renderEndedDetail();if(gameState.game_started&&document.getElementById('screenWaiting').classList.contains('active'))showScreen('screenList');}
 else if(msg.type==='question_detail')renderDetail(msg.data);
 else if(msg.type==='answer_result')showAnswerResult(msg.data);
 else if(msg.type==='hint_result')showHint(msg.data);
 else if(msg.type==='scores_update'){allScores=msg.data;if(gameState&&myTeam){gameState.score=msg.data[myTeam]||0;updateHeader();requestState();renderScoreBar();}}
 else if(msg.type==='game_started'){if(myTeam){requestState();showScreen('screenList');}}
-else if(msg.type==='game_reset'){myTeam=null;gameState=null;allScores={};showScreen('screenSelect');document.getElementById('teamInfo').style.display='none';}
+else if(msg.type==='game_ended'){forceEndedState();}
+else if(msg.type==='game_reset'){if(playerTimerInterval){clearInterval(playerTimerInterval);playerTimerInterval=null;}myTeam=null;gameState=null;allScores={};updateEndOverlay();showScreen('screenSelect');document.getElementById('teamInfo').style.display='none';}
 else if(msg.type==='comeback_bonus_applied'){if(myTeam){requestState();}if(msg.data&&msg.data.some(b=>b.team===myTeam))showToast('⚡ 逆転ボーナス発動');}
 else if(msg.type==='event'&&msg.data){const parts=[msg.data.bonus_msg,msg.data.penalty_msg,msg.data.message].filter(Boolean);if(parts.length)showToast(parts.join(' / '));}}
 function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');}
 function updateHeader(){if(!gameState)return;document.getElementById('headerScore').textContent=gameState.score.toFixed(1)+' pt';}
 function requestState(){if(ws&&myTeam)ws.send(JSON.stringify({type:'get_state',team:myTeam}));}
+function isAnswerLocked(){return !!(gameState&&gameState.game_state!=='running');}
+function updateEndOverlay(){const overlay=document.getElementById('endOverlay');overlay.classList.toggle('active',isAnswerLocked());}
+function syncPlayerTimer(){if(playerTimerInterval){clearInterval(playerTimerInterval);playerTimerInterval=null;}if(!gameState||gameState.game_state!=='running'||gameState.remaining_seconds==null)return;
+let rem=Math.max(0,Math.floor(gameState.remaining_seconds));playerTimerInterval=setInterval(()=>{rem-=1;if(!gameState)return;if(rem<=0){clearInterval(playerTimerInterval);playerTimerInterval=null;forceEndedState();return;}gameState.remaining_seconds=rem;renderScoreBar();},1000);}
+function forceEndedState(){if(playerTimerInterval){clearInterval(playerTimerInterval);playerTimerInterval=null;}if(!gameState){gameState={score:0,teams:{},questions:[],game_state:'ended',game_started:false,remaining_seconds:0};}
+gameState.game_state='ended';gameState.game_started=false;gameState.remaining_seconds=0;updateEndOverlay();renderList();if(document.getElementById('screenDetail').classList.contains('active'))renderEndedDetail();}
 const grid=document.getElementById('teamGrid');
 TEAMS.forEach(t=>{const b=document.createElement('button');b.className='team-btn';b.textContent=t;b.onclick=()=>selectTeam(t);grid.appendChild(b);});
 function selectTeam(t){myTeam=t;document.getElementById('confirmTeamName').textContent=t;showScreen('screenConfirm');}
@@ -127,7 +142,7 @@ const scores=hideOthers?{[myTeam]:gameState.score||0}:(Object.keys(allScores).le
 bar.innerHTML='';
 TEAMS.filter(t=>scores[t]!==undefined).forEach(t=>{const ci=TEAMS.indexOf(t);const color=teamColors[ci]||'#fff';const item=document.createElement('div');item.className='sb-item'+(t===myTeam?' my-team':'');item.innerHTML=`<span class="sb-dot" style="background:${color}"></span><span class="sb-name">${t}</span><span class="sb-val">${Number(scores[t]).toFixed(1)}pt</span>`;bar.appendChild(item);});}
 function formatPointValue(points){const pts=Number(points);return Number.isInteger(pts)?String(pts):pts.toFixed(1);}
-function formatPoints(q){const label=formatPointValue(q.points);return q.is_bonus?`⚡ ${label}点（ボーナス）`:`⭐ ${label}点`;}
+function formatPoints(q){const total=Number(q.points);const base=Number(q.base_points||q.points);if(q.is_bonus){const bonus=Math.max(0,total-base);return `⚡ ${formatPointValue(base)}+逆転ボーナス${formatPointValue(bonus)}=${formatPointValue(total)}点`;}return `⭐ ${formatPointValue(total)}点`;}
 function renderList(){if(!gameState)return;
 if(Object.keys(allScores).length===0&&gameState.score!==undefined){allScores[myTeam]=gameState.score;}
 renderScoreBar();
@@ -136,18 +151,19 @@ const groups=[{pts:2,label:'⭐⭐ 2点問題（基本）',cls:'section-2pt'},{p
 groups.forEach(g=>{const qs=gameState.questions.filter(q=>(q.base_points||q.points)===g.pts);if(!qs.length)return;
 const sh=document.createElement('div');sh.className='section-header '+g.cls;sh.textContent=g.label;area.appendChild(sh);
 const gridDiv=document.createElement('div');gridDiv.className='q-grid';
-qs.forEach(q=>{const basePts=q.base_points||q.points;const card=document.createElement('div');card.className='q-card pts-'+basePts+(q.solved?' solved':'')+(q.is_bonus?' bonus':'');
+qs.forEach(q=>{const basePts=q.base_points||q.points;const card=document.createElement('div');card.className='q-card pts-'+basePts+(q.solved?' solved':'')+(q.is_bonus?' bonus':'');if(isAnswerLocked())card.classList.add('disabled');
 let st='未回答',sc='status-unsolved';
 if(q.solved){st='✅ 正解済み';sc='status-solved';}
 else if(q.wrong_count>0&&q.hint_used){st=`❌×${q.wrong_count} 💡済`;sc='status-wrong';}
 else if(q.wrong_count>0){st=`❌×${q.wrong_count}`;sc='status-wrong';}
 else if(q.hint_used){st='💡 ヒント済';sc='status-hint';}
 card.innerHTML=`<div class="q-num">Q${q.id}</div><div class="q-title">${q.title}</div><div class="q-pts">${formatPoints(q)}</div><div class="q-status ${sc}">${st}</div>`;
-card.onclick=()=>openQuestion(q.id);gridDiv.appendChild(card);});
+card.onclick=()=>{if(!isAnswerLocked())openQuestion(q.id);};gridDiv.appendChild(card);});
 area.appendChild(gridDiv);});}
-function openQuestion(qid){currentQid=qid;ws.send(JSON.stringify({type:'get_question',team:myTeam,question_id:qid}));showScreen('screenDetail');}
+function openQuestion(qid){if(isAnswerLocked()){renderEndedDetail();showScreen('screenDetail');return;}currentQid=qid;ws.send(JSON.stringify({type:'get_question',team:myTeam,question_id:qid}));showScreen('screenDetail');}
 function backToList(){requestState();showScreen('screenList');}
-function renderDetail(q){if(!q)return;const card=document.getElementById('detailCard');
+function renderEndedDetail(){const card=document.getElementById('detailCard');card.innerHTML=`<div class="solved-badge" style="font-size:2.2em;padding:34px;background:rgba(255,107,74,.14);color:#ff8a65">終了</div><div class="result-msg wrong" style="margin-top:18px">制限時間のため、この問題にはもう回答できません。</div>`;}
+function renderDetail(q){if(!q)return;if(q.game_state&&q.game_state!=='running'){renderEndedDetail();return;}const card=document.getElementById('detailCard');
 const ptsClass=q.is_bonus?'d-pts bonus':'d-pts';
 if(q.solved){card.innerHTML=`<div class="d-num">Q${q.id}</div><div class="d-title">${q.title}</div><div class="${ptsClass}">${formatPoints(q)}</div><div class="d-question">${q.question}</div><div class="solved-badge">✅ 正解済み</div>`;return;}
 let hh='';if(q.has_hint){const label=q.hint_used?'💡 ヒントを見る (表示済み)':'💡 ヒントを見る (-1点)';hh=`<div class="hint-area"><button class="hint-btn" id="hintBtn" onclick="useHint(${q.id})">${label}</button><div class="hint-text" id="hintText" style="display:none"></div></div>`;}
@@ -155,12 +171,12 @@ let choicesHtml='';if(q.choices&&q.choices.length){choicesHtml='<div class="answ
 card.innerHTML=`<div class="d-num">Q${q.id}</div><div class="d-title">${q.title}</div><div class="${ptsClass}">${formatPoints(q)}</div><div class="d-question">${q.question}</div>${hh}${choicesHtml}<div id="resultArea"></div>`;
 if(q.choices&&q.choices.length){const ca=document.getElementById('choicesArea');q.choices.forEach(c=>{const btn=document.createElement('button');btn.className='choice-btn';btn.textContent=c;btn.onclick=function(){submitChoice(q.id,btn,c);};ca.appendChild(btn);});}
 if(q.wrong_count>0)document.getElementById('resultArea').innerHTML=`<div class="result-msg wrong">誤答 ${q.wrong_count}回</div>`;}
-function submitChoice(qid,btn,answer){const btns=document.querySelectorAll('.choice-btn');btns.forEach(b=>b.disabled=true);btn.classList.add('selected');ws.send(JSON.stringify({type:'answer',team:myTeam,question_id:qid,answer:answer}));}
-function submitAnswer(qid){const inp=document.getElementById('answerInput');if(!inp||!inp.value.trim())return;document.getElementById('submitBtn').disabled=true;ws.send(JSON.stringify({type:'answer',team:myTeam,question_id:qid,answer:inp.value.trim()}));}
+function submitChoice(qid,btn,answer){if(isAnswerLocked()){renderEndedDetail();return;}const btns=document.querySelectorAll('.choice-btn');btns.forEach(b=>b.disabled=true);btn.classList.add('selected');ws.send(JSON.stringify({type:'answer',team:myTeam,question_id:qid,answer:answer}));}
+function submitAnswer(qid){if(isAnswerLocked()){renderEndedDetail();return;}const inp=document.getElementById('answerInput');if(!inp||!inp.value.trim())return;document.getElementById('submitBtn').disabled=true;ws.send(JSON.stringify({type:'answer',team:myTeam,question_id:qid,answer:inp.value.trim()}));}
 function showAnswerResult(data){const area=document.getElementById('resultArea');if(!area)return;
 if(data.correct){area.innerHTML=`<div class="result-msg correct">🎉 ${data.message} (+${formatPointValue(data.points_earned)}点)</div>`;setTimeout(()=>{requestState();showScreen('screenList');},2000);}
-else{area.innerHTML=`<div class="result-msg wrong">${data.message}</div>`;const btns=document.querySelectorAll('.choice-btn');btns.forEach(b=>{b.disabled=false;b.classList.remove('selected');});}}
-function useHint(qid){ws.send(JSON.stringify({type:'use_hint',team:myTeam,question_id:qid}));}
+else{area.innerHTML=`<div class="result-msg wrong">${data.message}</div>`;if(!isAnswerLocked()){const btns=document.querySelectorAll('.choice-btn');btns.forEach(b=>{b.disabled=false;b.classList.remove('selected');});}}}
+function useHint(qid){if(isAnswerLocked()){renderEndedDetail();return;}ws.send(JSON.stringify({type:'use_hint',team:myTeam,question_id:qid}));}
 function showHint(data){if(!data.success)return;const ht=document.getElementById('hintText'),hb=document.getElementById('hintBtn');if(ht){ht.textContent='💡 '+data.hint;ht.style.display='block';}if(hb){hb.textContent='💡 ヒント表示済み';hb.onclick=null;}if(!data.already_used)showToast(data.message);}
 function showToast(msg){if(!msg)return;const t=document.getElementById('toast');t.textContent=msg;t.classList.remove('show');void t.offsetWidth;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),4000);}
 connect();

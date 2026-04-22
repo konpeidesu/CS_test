@@ -66,12 +66,27 @@ class QuizGame:
     def game_started(self):
         return self.game_state == "running"
 
+    def sync_time_limit(self):
+        if self.game_state != "running" or not self.game_start_time:
+            return False
+        if (time.time() - self.game_start_time) < self.time_limit:
+            return False
+        self.game_state = "ended"
+        return True
+
+    def current_remaining_seconds(self):
+        self.sync_time_limit()
+        if self.game_state == "running" and self.game_start_time:
+            elapsed = time.time() - self.game_start_time
+            return max(0, self.time_limit - elapsed)
+        return 0 if self.game_state == "ended" else None
+
     def question_points_for_team(self, team, question_id):
-        bonus_points = self.comeback_bonus.get(team, {}).get(question_id)
-        if bonus_points is not None:
-            return bonus_points
         q = next((qn for qn in self.questions if qn["id"] == question_id), None)
-        return q["points"] if q else 0
+        if not q:
+            return 0
+        bonus_points = self.comeback_bonus.get(team, {}).get(question_id, 0)
+        return q["points"] + bonus_points
 
     def apply_comeback_bonus(self):
         if self.comeback_bonus_applied:
@@ -91,20 +106,21 @@ class QuizGame:
                 continue
             target_count = max(1, math.floor(0.3 * len(unanswered)))
             target_count = min(target_count, len(unanswered))
-            final_points = (gap + 3) / target_count
+            bonus_points = (gap + 3) / target_count
             selected = random.sample(unanswered, target_count)
             for q in selected:
-                self.comeback_bonus[team][q["id"]] = final_points
+                self.comeback_bonus[team][q["id"]] = bonus_points
             applied.append({
                 "team": team,
                 "gap": gap,
                 "count": target_count,
-                "points": final_points,
+                "points": bonus_points,
                 "question_ids": [q["id"] for q in selected],
             })
         return applied
 
     def submit_answer(self, team, question_id, answer):
+        self.sync_time_limit()
         if self.game_state != "running":
             return {"success": False, "message": "ゲームは終了しました"}
         if team not in self.teams:
@@ -119,29 +135,28 @@ class QuizGame:
         if correct:
             earned_points = self.question_points_for_team(team, question_id)
             status["solved"] = True
-            self.teams[team] += earned_points
-            self.teams[team] = max(0, self.teams[team])
+            self.teams[team] = max(0, self.teams[team] + earned_points)
             bonus_msg = None
-            penalty_msg = None
+            penalty_messages = []
             if question_id not in self.first_solver:
                 self.first_solver[question_id] = team
-                self.teams[team] += 1.0
-                self.teams[team] = max(0, self.teams[team])
+                self.teams[team] = max(0, self.teams[team] + 1.0)
                 bonus_msg = f"{team} が最速正解ボーナス +1点！"
                 penalty_target = random.choice(TEAMS)
                 self.random_penalty[question_id] = penalty_target
                 self.teams[penalty_target] = max(0, self.teams[penalty_target] - 1.0)
-                penalty_msg = f"ランダム減点: {penalty_target} が -1点！"
+                penalty_messages.append(f"ランダム減点: {penalty_target} が -1点！")
             self.team_status[team][question_id] = status
-            return {"success": True, "correct": True, "message": "正解！", "points_earned": earned_points, "bonus_msg": bonus_msg, "penalty_msg": penalty_msg}
-        else:
-            status["wrong_count"] += 1
-            self.teams[team] -= 0.5
-            self.teams[team] = max(0, self.teams[team])
-            self.team_status[team][question_id] = status
-            return {"success": True, "correct": False, "message": f"不正解... (-0.5点) 誤答回数: {status['wrong_count']}"}
+            return {"success": True, "correct": True, "message": "正解！", "points_earned": earned_points, "bonus_msg": bonus_msg, "penalty_msg": " / ".join(penalty_messages) if penalty_messages else None}
+        status["wrong_count"] += 1
+        self.teams[team] = max(0, self.teams[team] - 0.5)
+        self.team_status[team][question_id] = status
+        return {"success": True, "correct": False, "message": f"不正解... (-0.5点) 誤答回数: {status['wrong_count']}", "penalty_msg": None}
 
     def use_hint(self, team, question_id):
+        self.sync_time_limit()
+        if self.game_state != "running":
+            return {"success": False, "message": "ゲームは終了しました"}
         if team not in self.teams:
             return {"success": False, "message": "無効なチームです"}
         q = next((q for q in self.questions if q["id"] == question_id), None)
@@ -151,27 +166,24 @@ class QuizGame:
         hint_text = q["hint"]
         if not status["hint_used"]:
             status["hint_used"] = True
-            self.teams[team] -= 1.0
-            self.teams[team] = max(0, self.teams[team])
+            self.teams[team] = max(0, self.teams[team] - 1.0)
             self.team_status[team][question_id] = status
             return {"success": True, "hint": hint_text, "message": "ヒント表示 (-1点)", "already_used": False}
-        else:
-            return {"success": True, "hint": hint_text, "message": "ヒント表示済み", "already_used": True}
+        return {"success": True, "hint": hint_text, "message": "ヒント表示済み", "already_used": True}
 
     def get_team_state(self, team):
+        self.sync_time_limit()
         qs = []
         for q in self.questions:
             st = self.team_status[team].get(q["id"], {"solved": False, "hint_used": False, "wrong_count": 0})
             points = self.question_points_for_team(team, q["id"])
             is_bonus = q["id"] in self.comeback_bonus.get(team, {})
             qs.append({"id": q["id"], "title": q["title"], "points": points, "base_points": q["points"], "is_bonus": is_bonus, "has_hint": bool(q.get("hint")), "solved": st.get("solved", False), "hint_used": st.get("hint_used", False), "wrong_count": st.get("wrong_count", 0)})
-        remaining = None
-        if self.game_state == "running" and self.game_start_time:
-            elapsed = time.time() - self.game_start_time
-            remaining = max(0, self.time_limit - elapsed)
+        remaining = self.current_remaining_seconds()
         return {"team": team, "score": self.teams[team], "teams": {t: self.teams[t] for t in TEAMS}, "questions": qs, "game_started": self.game_state == "running", "game_state": self.game_state, "remaining_seconds": remaining}
 
     def get_question_detail(self, question_id, team):
+        self.sync_time_limit()
         q = next((qn for qn in self.questions if qn["id"] == question_id), None)
         if not q:
             return None
@@ -180,13 +192,10 @@ class QuizGame:
         random.shuffle(choices)
         points = self.question_points_for_team(team, q["id"])
         is_bonus = q["id"] in self.comeback_bonus.get(team, {})
-        return {"id": q["id"], "title": q["title"], "question": q["question"], "points": points, "base_points": q["points"], "is_bonus": is_bonus, "has_hint": bool(q.get("hint")), "solved": st.get("solved", False), "hint_used": st.get("hint_used", False), "wrong_count": st.get("wrong_count", 0), "choices": choices}
+        return {"id": q["id"], "title": q["title"], "question": q["question"], "points": points, "base_points": q["points"], "is_bonus": is_bonus, "has_hint": bool(q.get("hint")), "solved": st.get("solved", False), "hint_used": st.get("hint_used", False), "wrong_count": st.get("wrong_count", 0), "choices": choices, "game_state": self.game_state, "remaining_seconds": self.current_remaining_seconds()}
 
     def get_admin_state(self):
-        remaining = None
-        if self.game_state == "running" and self.game_start_time:
-            elapsed = time.time() - self.game_start_time
-            remaining = max(0, self.time_limit - elapsed)
+        remaining = self.current_remaining_seconds()
         return {"teams": {t: self.teams[t] for t in TEAMS}, "team_status": {t: {str(qid): s for qid, s in statuses.items()} for t, statuses in self.team_status.items()}, "first_solver": {str(k): v for k, v in self.first_solver.items()}, "random_penalty": {str(k): v for k, v in self.random_penalty.items()}, "questions": self.questions, "comeback_bonus_applied": self.comeback_bonus_applied, "comeback_bonus": {t: {str(qid): pts for qid, pts in bonuses.items()} for t, bonuses in self.comeback_bonus.items()}, "game_started": self.game_state == "running", "game_state": self.game_state, "remaining_seconds": remaining, "time_limit_minutes": self.time_limit // 60}
 
     def reset(self):
@@ -266,8 +275,8 @@ async def player_ws(websocket: WebSocket):
             elif msg["type"] == "answer":
                 result = game.submit_answer(msg["team"], msg["question_id"], msg["answer"])
                 await websocket.send_text(json.dumps({"type": "answer_result", "data": result}, ensure_ascii=False))
-                if result.get("correct") and result.get("bonus_msg"):
-                    await broadcast_event({"bonus_msg": result["bonus_msg"], "penalty_msg": result["penalty_msg"]})
+                if result.get("bonus_msg") or result.get("penalty_msg"):
+                    await broadcast_event({"bonus_msg": result.get("bonus_msg"), "penalty_msg": result.get("penalty_msg")})
                 await broadcast_scores()
                 await broadcast_admin()
                 state = game.get_team_state(msg["team"])
