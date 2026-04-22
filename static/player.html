@@ -22,6 +22,7 @@ body{font-family:'Segoe UI','Hiragino Sans',sans-serif;background:linear-gradien
 .team-btn:nth-child(4){background:linear-gradient(135deg,#fa709a,#fee140)}
 .team-btn:nth-child(5){background:linear-gradient(135deg,#a18cd1,#fbc2eb)}
 .team-btn:nth-child(6){background:linear-gradient(135deg,#fccb90,#d57eeb)}
+.team-btn:nth-child(7){background:linear-gradient(135deg,#e74c3c,#c0392b);border:3px solid #ff6b6b;box-shadow:0 0 15px rgba(231,76,60,.5)}
 .confirm-box{text-align:center;margin-top:60px}
 .confirm-box h2{font-size:1.5em;margin-bottom:20px}
 .confirm-team{font-size:2.5em;font-weight:bold;margin:20px 0;padding:20px;background:rgba(255,255,255,.1);border-radius:15px;display:inline-block}
@@ -126,7 +127,7 @@ else if(msg.type==='game_started'){if(myTeam){requestState();showScreen('screenL
 else if(msg.type==='game_ended'){forceEndedState();}
 else if(msg.type==='game_reset'){if(playerTimerInterval){clearInterval(playerTimerInterval);playerTimerInterval=null;}myTeam=null;gameState=null;allScores={};updateEndOverlay();showScreen('screenSelect');document.getElementById('teamInfo').style.display='none';}
 else if(msg.type==='comeback_bonus_applied'){if(myTeam){requestState();}if(msg.data&&msg.data.some(b=>b.team===myTeam))showToast('⚡ 逆転ボーナス発動');}
-else if(msg.type==='edl_unlocked'){if(myTeam===EDL_TEAM){requestState();showToast('🔓 新問題が解放されました！3点問題の残り + 4点問題');}}
+else if(msg.type==='edl_unlocked'){if(myTeam===EDL_TEAM){requestState();let t='🔓 新問題が解放されました！3点問題の残り + 4点問題';if(msg.early_bonus)t+=' ⚡ 早期クリアボーナス +5点！';showToast(t);}}
 else if(msg.type==='event'&&msg.data){const parts=[msg.data.bonus_msg,msg.data.penalty_msg,msg.data.message].filter(Boolean);if(parts.length)showToast(parts.join(' / '));}}
 function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');}
 function updateHeader(){if(!gameState)return;document.getElementById('headerScore').textContent=gameState.score.toFixed(1)+' pt';}

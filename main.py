@@ -65,6 +65,7 @@ class QuizGame:
         self.edl_unlocked_qids: set = set()  # EDL解放済み問題ID
         self.edl_phase1_qids: set = set()    # EDL開始時解放問題ID（フェーズ1）
         self.edl_hard_unlocked: bool = False  # フェーズ2解放済みフラグ
+        self.edl_early_bonus_given: bool = False  # フェーズ1早期クリアボーナス付与済み
 
     @property
     def game_started(self):
@@ -79,6 +80,7 @@ class QuizGame:
         self.edl_phase1_qids = set(q2) | set(half3)
         self.edl_unlocked_qids = set(self.edl_phase1_qids)
         self.edl_hard_unlocked = False
+        self.edl_early_bonus_given = False
 
     def unlock_edl_hard_questions(self):
         """3点問題の残り半分+4点問題を解放（タイマー半分 or フェーズ1全解答時）"""
@@ -100,6 +102,13 @@ class QuizGame:
             if not st.get("solved", False):
                 return False
         return True
+
+    def is_edl_early_clear(self):
+        """残り時間が半分以上残っている（早期クリア）かどうか"""
+        rem = self.current_remaining_seconds()
+        if rem is None:
+            return False
+        return rem > self.time_limit / 2
 
     def is_edl_question_locked(self, question_id):
         """EDLチームにとってこの問題がロック中かどうか"""
@@ -127,6 +136,9 @@ class QuizGame:
         q = next((qn for qn in self.questions if qn["id"] == question_id), None)
         if not q:
             return 0
+        # EDLチームは2点問題が1点
+        if team == EDL_TEAM and q["points"] == 2:
+            return 1
         return q["points"]
 
     def apply_comeback_bonus(self):
@@ -236,6 +248,11 @@ class QuizGame:
             if team == EDL_TEAM and self.check_edl_phase1_complete():
                 newly = self.unlock_edl_hard_questions()
                 result["edl_phase2_unlocked"] = newly
+                # 残り時間半分より前に全解答→早期クリアボーナス+5点
+                if self.is_edl_early_clear() and not self.edl_early_bonus_given:
+                    self.edl_early_bonus_given = True
+                    self.teams[EDL_TEAM] = max(0, self.teams[EDL_TEAM] + 5.0)
+                    result["edl_early_bonus"] = True
             return result
         # 誤答: EDLは-5点、他は-0.5点
         status["wrong_count"] += 1
@@ -393,10 +410,13 @@ async def player_ws(websocket: WebSocket):
                 # EDLフェーズ1全解答で即時解放
                 if result.get("edl_phase2_unlocked") is not None:
                     newly = result["edl_phase2_unlocked"]
-                    await broadcast_event({"message": "🔓 EDLチームがフェーズ1全解答！3点問題の残り + 4点問題が解放されました！"})
+                    msg_text = "🔓 EDLチームがフェーズ1全解答！3点問題の残り + 4点問題が解放されました！"
+                    if result.get("edl_early_bonus"):
+                        msg_text += " ⚡ 早期クリアボーナス +5点！"
+                    await broadcast_event({"message": msg_text})
                     for ws in game.connections:
                         try:
-                            await ws.send_text(json.dumps({"type": "edl_unlocked", "unlocked_qids": newly}, ensure_ascii=False))
+                            await ws.send_text(json.dumps({"type": "edl_unlocked", "unlocked_qids": newly, "early_bonus": result.get("edl_early_bonus", False)}, ensure_ascii=False))
                         except Exception:
                             pass
                     await broadcast_admin()
