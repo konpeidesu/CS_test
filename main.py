@@ -32,7 +32,7 @@ def default_questions() -> List[dict]:
         {"id": 16, "title": "齊藤諒太さん", "question": "齊藤諒太さんは何オタク？", "answer": "アイドル", "choices": ["アイドル", "鉄道", "アニメ"], "points": 3, "hint": "コバナシ"},
         {"id": 17, "title": "CMの芸能人", "question": "マクニカのCMで起用されている芸能人は？", "answer": "キンタロー、要潤", "choices": ["キンタロー、要潤", "どぶろっく", "サンドウィッチマン"], "points": 2, "hint": ""},
         {"id": 18, "title": "スポンサーサッカー", "question": "マクニカがスポンサーをしているサッカーチームは？", "answer": "横浜FC", "choices": ["横浜FC", "横浜F・マリノス", "湘南ベルマーレ"], "points": 2, "hint": ""},
-        {"id": 19, "title": "川合航平さんの住所", "question": "川合航平さんの昨年末まで住んでいた場所は？", "answer": "歌舞伎町", "choices": ["歌舞伎町", "渋谷", "丸の内"], "points": 4, "hint": "聞いてみよう"},
+        {"id": 19, "title": "川合航平さんの元居住地", "question": "川合航平さんの昨年末まで住んでいた場所は？", "answer": "歌舞伎町", "choices": ["歌舞伎町", "渋谷", "丸の内"], "points": 4, "hint": "聞いてみよう"},
         {"id": 20, "title": "位置確認アプリ", "question": "社員がオフィスのどこにいるか分かるアプリは？", "answer": "TeamsNavi", "choices": ["TeamsNavi", "Macnica Navi", "Phoone App"], "points": 2, "hint": ""},
         {"id": 21, "title": "ロジの場所", "question": "マクニカのロジがある場所は？", "answer": "新子安", "choices": ["新子安", "湘南", "平塚"], "points": 2, "hint": ""},
         {"id": 22, "title": "買収した会社", "question": "マクニカが自動運転ビジネスをするために買収した会社は？", "answer": "Naviya", "choices": ["Naviya", "CyberKnight", "グローセル"], "points": 2, "hint": ""},
