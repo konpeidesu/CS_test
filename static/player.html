@@ -142,7 +142,7 @@ const scores=hideOthers?{[myTeam]:gameState.score||0}:(Object.keys(allScores).le
 bar.innerHTML='';
 TEAMS.filter(t=>scores[t]!==undefined).forEach(t=>{const ci=TEAMS.indexOf(t);const color=teamColors[ci]||'#fff';const item=document.createElement('div');item.className='sb-item'+(t===myTeam?' my-team':'');item.innerHTML=`<span class="sb-dot" style="background:${color}"></span><span class="sb-name">${t}</span><span class="sb-val">${Number(scores[t]).toFixed(1)}pt</span>`;bar.appendChild(item);});}
 function formatPointValue(points){const pts=Number(points);return Number.isInteger(pts)?String(pts):pts.toFixed(1);}
-function formatPoints(q){const total=Number(q.points);const base=Number(q.base_points||q.points);if(q.is_bonus){const bonus=Math.max(0,total-base);return `⚡ ${formatPointValue(base)}+逆転ボーナス${formatPointValue(bonus)}=${formatPointValue(total)}点`;}return `⭐ ${formatPointValue(total)}点`;}
+function formatPoints(q){const total=Number(q.points);return q.is_bonus?`⚡ ${formatPointValue(total)}点`:`⭐ ${formatPointValue(total)}点`;}
 function renderList(){if(!gameState)return;
 if(Object.keys(allScores).length===0&&gameState.score!==undefined){allScores[myTeam]=gameState.score;}
 renderScoreBar();
