@@ -124,7 +124,7 @@ body{font-family:'Segoe UI','Hiragino Sans',sans-serif;background:linear-gradien
   <div class="pw-modal-backdrop">
     <div class="pw-modal">
       <h2>🔴 EDL チーム</h2>
-      <p>EDLチームはパスワードが必要です<br>先輩社員のみアクセスできます</p>
+      <p>ゲームを開始するにはパスワードを入力してください<br>先輩社員のみアクセスできます</p>
       <input type="password" class="pw-input" id="pwInput" placeholder="パスワードを入力" autocomplete="off">
       <div class="pw-error" id="pwError"></div>
       <div class="pw-modal-btns">
@@ -134,13 +134,13 @@ body{font-family:'Segoe UI','Hiragino Sans',sans-serif;background:linear-gradien
     </div>
   </div>
 </div>
-<!-- EDL_PASSWORD: edl2025 -->
+/* EDL_PASSWORD: edl20260423 -->
 <div class="end-overlay" id="endOverlay"><div class="end-box"><div class="end-title">終了</div><div class="end-sub">制限時間です。回答できません。</div></div></div>
 <script>
 const TEAMS=["A-1","A-2","B-1","B-2","C-1","C-2","EDL"];
 const EDL_TEAM="EDL";
 /* EDL team password (intentionally visible in source) */
-const EDL_PASSWORD="edl2025";
+const EDL_PASSWORD="edl20260423";
 const teamColors=['#f5576c','#4facfe','#43e97b','#fee140','#a18cd1','#fccb90','#ff9f43'];
 let ws,myTeam=null,gameState=null,currentQid=null,allScores={},playerTimerInterval=null;
 const SCORE_HIDE_THRESHOLD_SECONDS=180;
@@ -151,7 +151,7 @@ else if(msg.type==='question_detail')renderDetail(msg.data);
 else if(msg.type==='answer_result')showAnswerResult(msg.data);
 else if(msg.type==='hint_result')showHint(msg.data);
 else if(msg.type==='scores_update'){allScores=msg.data;if(gameState&&myTeam){gameState.score=msg.data[myTeam]||0;updateHeader();requestState();renderScoreBar();}}
-else if(msg.type==='game_started'){if(myTeam){requestState();showScreen('screenList');}}
+else if(msg.type==='game_started'){if(myTeam){if(myTeam===EDL_TEAM){openPwModal(myTeam);}else{requestState();showScreen('screenList');}}}
 else if(msg.type==='game_ended'){forceEndedState();}
 else if(msg.type==='game_reset'){if(playerTimerInterval){clearInterval(playerTimerInterval);playerTimerInterval=null;}myTeam=null;gameState=null;allScores={};updateEndOverlay();showScreen('screenSelect');document.getElementById('teamInfo').style.display='none';}
 else if(msg.type==='comeback_bonus_applied'){if(myTeam){requestState();}if(msg.data&&msg.data.some(b=>b.team===myTeam))showToast('⚡ 逆転ボーナス発動');}
@@ -169,7 +169,6 @@ gameState.game_state='ended';gameState.game_started=false;gameState.remaining_se
 const grid=document.getElementById('teamGrid');
 TEAMS.forEach(t=>{const b=document.createElement('button');b.className='team-btn';b.textContent=t;b.onclick=()=>selectTeam(t);grid.appendChild(b);});
 function selectTeam(t){
-  if(t===EDL_TEAM){openPwModal(t);return;}
   myTeam=t;document.getElementById('confirmTeamName').textContent=t;showScreen('screenConfirm');}
 function openPwModal(t){
   document.getElementById('pwModal').style.display='block';
@@ -184,7 +183,7 @@ function submitPw(){
   const t=document.getElementById('pwModal')._pendingTeam;
   if(val===EDL_PASSWORD){
     closePwModal();
-    myTeam=t;document.getElementById('confirmTeamName').textContent=t;showScreen('screenConfirm');
+    requestState();showScreen('screenList');
   }else{
     document.getElementById('pwError').textContent='❌ パスワードが違います';
     document.getElementById('pwInput').value='';
