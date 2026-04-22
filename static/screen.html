@@ -64,9 +64,9 @@ body{font-family:'Segoe UI','Hiragino Sans',sans-serif;background:linear-gradien
 <div class="urgent-countdown" id="urgentCountdown"><div class="urgent-countdown-inner" id="urgentCountdownText">02:59</div></div>
 <div class="toast" id="toast"></div>
 <script>
-const TEAMS=["A-1","A-2","B-1","B-2","C-1","C-2"];
-const teamColors=['#f5576c','#4facfe','#43e97b','#fee140','#a18cd1','#fccb90'];
-const barColors=['linear-gradient(90deg,#f5576c,#f093fb)','linear-gradient(90deg,#4facfe,#00f2fe)','linear-gradient(90deg,#43e97b,#38f9d7)','linear-gradient(90deg,#fa709a,#fee140)','linear-gradient(90deg,#a18cd1,#fbc2eb)','linear-gradient(90deg,#fccb90,#d57eeb)'];
+const TEAMS=["A-1","A-2","B-1","B-2","C-1","C-2","EDL"];
+const teamColors=['#f5576c','#4facfe','#43e97b','#fee140','#a18cd1','#fccb90','#ff9f43'];
+const barColors=['linear-gradient(90deg,#f5576c,#f093fb)','linear-gradient(90deg,#4facfe,#00f2fe)','linear-gradient(90deg,#43e97b,#38f9d7)','linear-gradient(90deg,#fa709a,#fee140)','linear-gradient(90deg,#a18cd1,#fbc2eb)','linear-gradient(90deg,#fccb90,#d57eeb)','linear-gradient(90deg,#ff9f43,#ee5a24)'];
 let ws,adminState=null,prevScores={},timerInterval=null,isLastMinute=false,currentGameState='waiting';
 const HIDE_SCORE_THRESHOLD_SECONDS=180;
 function connect(){const p=location.protocol==='https:'?'wss:':'ws:';ws=new WebSocket(`${p}//${location.host}/ws/admin`);

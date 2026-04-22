@@ -60,6 +60,10 @@ body{font-family:'Segoe UI','Hiragino Sans',sans-serif;background:linear-gradien
 .status-solved{background:rgba(46,204,113,.3);color:#2ecc71}
 .status-hint{background:rgba(241,196,15,.3);color:#f1c40f}
 .status-wrong{background:rgba(231,76,60,.3);color:#e74c3c}
+.status-locked{background:rgba(100,100,100,.3);color:#888}
+.q-card.locked{opacity:.45;cursor:not-allowed;filter:grayscale(.8)}
+.locked-badge{text-align:center;padding:20px;background:rgba(100,100,100,.15);border-radius:10px;color:#888;font-size:1.2em}
+.edl-badge{display:inline-block;background:linear-gradient(135deg,#f5a623,#e74c3c);color:#fff;font-size:.75em;padding:2px 8px;border-radius:8px;margin-left:8px;font-weight:bold;vertical-align:middle}
 .detail-back{display:inline-flex;align-items:center;gap:5px;color:#aaa;cursor:pointer;margin-bottom:20px;font-size:.95em}
 .detail-back:hover{color:#fff}
 .detail-card{background:rgba(255,255,255,.08);border-radius:15px;padding:25px}
@@ -106,8 +110,9 @@ body{font-family:'Segoe UI','Hiragino Sans',sans-serif;background:linear-gradien
 <div class="toast" id="toast"></div>
 <div class="end-overlay" id="endOverlay"><div class="end-box"><div class="end-title">終了</div><div class="end-sub">制限時間です。回答できません。</div></div></div>
 <script>
-const TEAMS=["A-1","A-2","B-1","B-2","C-1","C-2"];
-const teamColors=['#f5576c','#4facfe','#43e97b','#fee140','#a18cd1','#fccb90'];
+const TEAMS=["A-1","A-2","B-1","B-2","C-1","C-2","EDL"];
+const EDL_TEAM="EDL";
+const teamColors=['#f5576c','#4facfe','#43e97b','#fee140','#a18cd1','#fccb90','#ff9f43'];
 let ws,myTeam=null,gameState=null,currentQid=null,allScores={},playerTimerInterval=null;
 const SCORE_HIDE_THRESHOLD_SECONDS=180;
 function connect(){const p=location.protocol==='https:'?'wss:':'ws:';ws=new WebSocket(`${p}//${location.host}/ws/player`);ws.onmessage=handleMessage;ws.onclose=()=>setTimeout(connect,2000);}
@@ -121,6 +126,7 @@ else if(msg.type==='game_started'){if(myTeam){requestState();showScreen('screenL
 else if(msg.type==='game_ended'){forceEndedState();}
 else if(msg.type==='game_reset'){if(playerTimerInterval){clearInterval(playerTimerInterval);playerTimerInterval=null;}myTeam=null;gameState=null;allScores={};updateEndOverlay();showScreen('screenSelect');document.getElementById('teamInfo').style.display='none';}
 else if(msg.type==='comeback_bonus_applied'){if(myTeam){requestState();}if(msg.data&&msg.data.some(b=>b.team===myTeam))showToast('⚡ 逆転ボーナス発動');}
+else if(msg.type==='edl_unlocked'){if(myTeam===EDL_TEAM){requestState();showToast('🔓 新問題が解放されました！3点問題の残り + 4点問題');}}
 else if(msg.type==='event'&&msg.data){const parts=[msg.data.bonus_msg,msg.data.penalty_msg,msg.data.message].filter(Boolean);if(parts.length)showToast(parts.join(' / '));}}
 function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');}
 function updateHeader(){if(!gameState)return;document.getElementById('headerScore').textContent=gameState.score.toFixed(1)+' pt';}
@@ -151,24 +157,31 @@ const groups=[{pts:2,label:'⭐⭐ 2点問題（基本）',cls:'section-2pt'},{p
 groups.forEach(g=>{const qs=gameState.questions.filter(q=>(q.base_points||q.points)===g.pts);if(!qs.length)return;
 const sh=document.createElement('div');sh.className='section-header '+g.cls;sh.textContent=g.label;area.appendChild(sh);
 const gridDiv=document.createElement('div');gridDiv.className='q-grid';
-qs.forEach(q=>{const basePts=q.base_points||q.points;const card=document.createElement('div');card.className='q-card pts-'+basePts+(q.solved?' solved':'')+(q.is_bonus?' bonus':'');if(isAnswerLocked())card.classList.add('disabled');
+qs.forEach(q=>{const basePts=q.base_points||q.points;const card=document.createElement('div');
+const isLocked=q.locked;
+card.className='q-card pts-'+basePts+(q.solved?' solved':'')+(q.is_bonus?' bonus':'')+(isLocked?' locked':'');
+if(isAnswerLocked()||isLocked)card.classList.add('disabled');
 let st='未回答',sc='status-unsolved';
-if(q.solved){st='✅ 正解済み';sc='status-solved';}
+if(isLocked){st='🔒 未解放';sc='status-locked';}
+else if(q.solved){st='✅ 正解済み';sc='status-solved';}
 else if(q.wrong_count>0&&q.hint_used){st=`❌×${q.wrong_count} 💡済`;sc='status-wrong';}
 else if(q.wrong_count>0){st=`❌×${q.wrong_count}`;sc='status-wrong';}
 else if(q.hint_used){st='💡 ヒント済';sc='status-hint';}
 card.innerHTML=`<div class="q-num">Q${q.id}</div><div class="q-title">${q.title}</div><div class="q-pts">${formatPoints(q)}</div><div class="q-status ${sc}">${st}</div>`;
-card.onclick=()=>{if(!isAnswerLocked())openQuestion(q.id);};gridDiv.appendChild(card);});
+card.onclick=()=>{if(!isAnswerLocked()&&!isLocked)openQuestion(q.id);};gridDiv.appendChild(card);});
 area.appendChild(gridDiv);});}
 function openQuestion(qid){if(isAnswerLocked()){renderEndedDetail();showScreen('screenDetail');return;}currentQid=qid;ws.send(JSON.stringify({type:'get_question',team:myTeam,question_id:qid}));showScreen('screenDetail');}
 function backToList(){requestState();showScreen('screenList');}
 function renderEndedDetail(){const card=document.getElementById('detailCard');card.innerHTML=`<div class="solved-badge" style="font-size:2.2em;padding:34px;background:rgba(255,107,74,.14);color:#ff8a65">終了</div><div class="result-msg wrong" style="margin-top:18px">制限時間のため、この問題にはもう回答できません。</div>`;}
 function renderDetail(q){if(!q)return;if(q.game_state&&q.game_state!=='running'){renderEndedDetail();return;}const card=document.getElementById('detailCard');
 const ptsClass=q.is_bonus?'d-pts bonus':'d-pts';
+if(q.locked){card.innerHTML=`<div class="d-num">Q${q.id}</div><div class="d-title">${q.title}</div><div class="${ptsClass}">${formatPoints(q)}</div><div class="locked-badge">🔒 この問題はまだ解放されていません<br><small style="color:#666">残り時間が半分になると解放されます</small></div>`;return;}
 if(q.solved){card.innerHTML=`<div class="d-num">Q${q.id}</div><div class="d-title">${q.title}</div><div class="${ptsClass}">${formatPoints(q)}</div><div class="d-question">${q.question}</div><div class="solved-badge">✅ 正解済み</div>`;return;}
-let hh='';if(q.has_hint){const label=q.hint_used?'💡 ヒントを見る (表示済み)':'💡 ヒントを見る (-1点)';hh=`<div class="hint-area"><button class="hint-btn" id="hintBtn" onclick="useHint(${q.id})">${label}</button><div class="hint-text" id="hintText" style="display:none"></div></div>`;}
+// EDLチームはヒントボタンを表示しない
+let hh='';if(q.has_hint&&myTeam!==EDL_TEAM){const label=q.hint_used?'💡 ヒントを見る (表示済み)':'💡 ヒントを見る (-1点)';hh=`<div class="hint-area"><button class="hint-btn" id="hintBtn" onclick="useHint(${q.id})">${label}</button><div class="hint-text" id="hintText" style="display:none"></div></div>`;}
+const edlBadge=myTeam===EDL_TEAM?`<span class="edl-badge">EDL: 誤答-5点</span>`:'';
 let choicesHtml='';if(q.choices&&q.choices.length){choicesHtml='<div class="answer-area" id="choicesArea"></div>';}
-card.innerHTML=`<div class="d-num">Q${q.id}</div><div class="d-title">${q.title}</div><div class="${ptsClass}">${formatPoints(q)}</div><div class="d-question">${q.question}</div>${hh}${choicesHtml}<div id="resultArea"></div>`;
+card.innerHTML=`<div class="d-num">Q${q.id}</div><div class="d-title">${q.title}${edlBadge}</div><div class="${ptsClass}">${formatPoints(q)}</div><div class="d-question">${q.question}</div>${hh}${choicesHtml}<div id="resultArea"></div>`;
 if(q.choices&&q.choices.length){const ca=document.getElementById('choicesArea');q.choices.forEach(c=>{const btn=document.createElement('button');btn.className='choice-btn';btn.textContent=c;btn.onclick=function(){submitChoice(q.id,btn,c);};ca.appendChild(btn);});}
 if(q.wrong_count>0)document.getElementById('resultArea').innerHTML=`<div class="result-msg wrong">誤答 ${q.wrong_count}回</div>`;}
 function submitChoice(qid,btn,answer){if(isAnswerLocked()){renderEndedDetail();return;}const btns=document.querySelectorAll('.choice-btn');btns.forEach(b=>b.disabled=true);btn.classList.add('selected');ws.send(JSON.stringify({type:'answer',team:myTeam,question_id:qid,answer:answer}));}

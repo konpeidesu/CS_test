@@ -9,7 +9,8 @@ import math
 
 app = FastAPI()
 
-TEAMS = ["A-1", "A-2", "B-1", "B-2", "C-1", "C-2"]
+TEAMS = ["A-1", "A-2", "B-1", "B-2", "C-1", "C-2", "EDL"]
+EDL_TEAM = "EDL"
 
 
 def default_questions() -> List[dict]:
@@ -61,10 +62,31 @@ class QuizGame:
         self.time_limit: int = 1200  # 20 minutes
         self.comeback_bonus_applied: bool = False
         self.comeback_bonus: Dict[str, Dict[int, float]] = {t: {} for t in TEAMS}
+        self.edl_unlocked_qids: set = set()  # EDL解放済み問題ID
 
     @property
     def game_started(self):
         return self.game_state == "running"
+
+    def init_edl_unlock(self):
+        """EDL開始時解放: 2点問題全部 + 3点問題の半分(ランダム)"""
+        q2 = [q["id"] for q in self.questions if q["points"] == 2]
+        q3 = [q["id"] for q in self.questions if q["points"] == 3]
+        random.shuffle(q3)
+        half3 = q3[:len(q3) // 2]
+        self.edl_unlocked_qids = set(q2) | set(half3)
+
+    def unlock_edl_hard_questions(self):
+        """残り時間半分時に3点問題の残り半分+4点問題を解放"""
+        q3_all = set(q["id"] for q in self.questions if q["points"] == 3)
+        q4_all = set(q["id"] for q in self.questions if q["points"] == 4)
+        newly_unlocked = (q3_all | q4_all) - self.edl_unlocked_qids
+        self.edl_unlocked_qids |= q3_all | q4_all
+        return list(newly_unlocked)
+
+    def is_edl_question_locked(self, question_id):
+        """EDLチームにとってこの問題がロック中かどうか"""
+        return question_id not in self.edl_unlocked_qids
 
     def sync_time_limit(self):
         if self.game_state != "running" or not self.game_start_time:
@@ -167,6 +189,9 @@ class QuizGame:
         q = next((q for q in self.questions if q["id"] == question_id), None)
         if not q:
             return {"success": False, "message": "問題が見つかりません"}
+        # EDLチームのロックチェック
+        if team == EDL_TEAM and self.is_edl_question_locked(question_id):
+            return {"success": False, "message": "🔒 この問題はまだ解放されていません"}
         status = self.team_status[team].get(question_id, {"solved": False, "hint_used": False, "wrong_count": 0})
         if status["solved"]:
             return {"success": False, "message": "既に正解済みです"}
@@ -179,18 +204,24 @@ class QuizGame:
             penalty_messages = []
             if question_id not in self.first_solver:
                 self.first_solver[question_id] = team
-                self.teams[team] = max(0, self.teams[team] + 1.0)
-                bonus_msg = f"{team} が最速正解ボーナス +1点！"
+                # EDLは最速ボーナス(+1点)なし、ただしランダム減点対象にはなる
+                if team != EDL_TEAM:
+                    self.teams[team] = max(0, self.teams[team] + 1.0)
+                    bonus_msg = f"{team} が最速正解ボーナス +1点！"
+                # ランダム減点は全チーム対象（EDL含む）
                 penalty_target = random.choice(TEAMS)
                 self.random_penalty[question_id] = penalty_target
                 self.teams[penalty_target] = max(0, self.teams[penalty_target] - 1.0)
                 penalty_messages.append(f"ランダム減点: {penalty_target} が -1点！")
             self.team_status[team][question_id] = status
             return {"success": True, "correct": True, "message": "正解！", "points_earned": earned_points, "bonus_msg": bonus_msg, "penalty_msg": " / ".join(penalty_messages) if penalty_messages else None}
+        # 誤答: EDLは-5点、他は-0.5点
         status["wrong_count"] += 1
-        self.teams[team] = max(0, self.teams[team] - 0.5)
+        penalty = 5.0 if team == EDL_TEAM else 0.5
+        self.teams[team] = max(0, self.teams[team] - penalty)
         self.team_status[team][question_id] = status
-        return {"success": True, "correct": False, "message": f"不正解... (-0.5点) 誤答回数: {status['wrong_count']}", "penalty_msg": None}
+        msg = f"不正解... (-{penalty:.1g}点) 誤答回数: {status['wrong_count']}"
+        return {"success": True, "correct": False, "message": msg, "penalty_msg": None}
 
     def use_hint(self, team, question_id):
         self.sync_time_limit()
@@ -198,6 +229,9 @@ class QuizGame:
             return {"success": False, "message": "ゲームは終了しました"}
         if team not in self.teams:
             return {"success": False, "message": "無効なチームです"}
+        # EDLチームはヒント使用禁止
+        if team == EDL_TEAM:
+            return {"success": False, "message": "🚫 EDLチームはヒントを使用できません"}
         q = next((q for q in self.questions if q["id"] == question_id), None)
         if not q or not q.get("hint"):
             return {"success": False, "message": "ヒントがありません"}
@@ -217,9 +251,10 @@ class QuizGame:
             st = self.team_status[team].get(q["id"], {"solved": False, "hint_used": False, "wrong_count": 0})
             points = self.question_points_for_team(team, q["id"])
             is_bonus = q["id"] in self.comeback_bonus.get(team, {})
-            qs.append({"id": q["id"], "title": q["title"], "points": points, "base_points": q["points"], "is_bonus": is_bonus, "has_hint": bool(q.get("hint")), "solved": st.get("solved", False), "hint_used": st.get("hint_used", False), "wrong_count": st.get("wrong_count", 0)})
+            locked = (team == EDL_TEAM) and self.is_edl_question_locked(q["id"])
+            qs.append({"id": q["id"], "title": q["title"], "points": points, "base_points": q["points"], "is_bonus": is_bonus, "has_hint": bool(q.get("hint")), "solved": st.get("solved", False), "hint_used": st.get("hint_used", False), "wrong_count": st.get("wrong_count", 0), "locked": locked})
         remaining = self.current_remaining_seconds()
-        return {"team": team, "score": self.teams[team], "teams": {t: self.teams[t] for t in TEAMS}, "questions": qs, "game_started": self.game_state == "running", "game_state": self.game_state, "remaining_seconds": remaining}
+        return {"team": team, "score": self.teams[team], "teams": {t: self.teams[t] for t in TEAMS}, "questions": qs, "game_started": self.game_state == "running", "game_state": self.game_state, "remaining_seconds": remaining, "is_edl": team == EDL_TEAM}
 
     def get_question_detail(self, question_id, team):
         self.sync_time_limit()
@@ -235,7 +270,7 @@ class QuizGame:
 
     def get_admin_state(self):
         remaining = self.current_remaining_seconds()
-        return {"teams": {t: self.teams[t] for t in TEAMS}, "team_status": {t: {str(qid): s for qid, s in statuses.items()} for t, statuses in self.team_status.items()}, "first_solver": {str(k): v for k, v in self.first_solver.items()}, "random_penalty": {str(k): v for k, v in self.random_penalty.items()}, "questions": self.questions, "comeback_bonus_applied": self.comeback_bonus_applied, "comeback_bonus": {t: {str(qid): pts for qid, pts in bonuses.items()} for t, bonuses in self.comeback_bonus.items()}, "game_started": self.game_state == "running", "game_state": self.game_state, "remaining_seconds": remaining, "time_limit_minutes": self.time_limit // 60}
+        return {"teams": {t: self.teams[t] for t in TEAMS}, "team_status": {t: {str(qid): s for qid, s in statuses.items()} for t, statuses in self.team_status.items()}, "first_solver": {str(k): v for k, v in self.first_solver.items()}, "random_penalty": {str(k): v for k, v in self.random_penalty.items()}, "questions": self.questions, "comeback_bonus_applied": self.comeback_bonus_applied, "comeback_bonus": {t: {str(qid): pts for qid, pts in bonuses.items()} for t, bonuses in self.comeback_bonus.items()}, "game_started": self.game_state == "running", "game_state": self.game_state, "remaining_seconds": remaining, "time_limit_minutes": self.time_limit // 60, "edl_unlocked_qids": list(self.edl_unlocked_qids)}
 
     def reset(self):
         conns = self.connections
@@ -283,6 +318,23 @@ async def broadcast_bonus_applied(applied):
             await ws.send_text(data)
         except Exception:
             pass
+
+
+async def trigger_edl_unlock(started_at, time_limit):
+    """残り時間が半分になったらEDLの3点後半+4点問題を解放"""
+    await asyncio.sleep(time_limit / 2)
+    if game.game_state != "running" or game.game_start_time != started_at:
+        return
+    newly = game.unlock_edl_hard_questions()
+    if newly:
+        await broadcast_event({"message": f"🔓 EDLチームに新問題が解放されました！（3点問題の残り半分 + 4点問題）"})
+        # EDLプレイヤーに状態更新を通知
+        for ws in game.connections:
+            try:
+                await ws.send_text(json.dumps({"type": "edl_unlocked", "unlocked_qids": newly}, ensure_ascii=False))
+            except Exception:
+                pass
+        await broadcast_admin()
 
 
 async def trigger_comeback_bonus_at_deadline(started_at, time_limit):
@@ -348,7 +400,9 @@ async def admin_ws(websocket: WebSocket):
                 game.time_limit = max(1, min(minutes, 999)) * 60
                 game.game_state = "running"
                 game.game_start_time = time.time()
+                game.init_edl_unlock()  # EDL初期解放問題をセット
                 asyncio.create_task(trigger_comeback_bonus_at_deadline(game.game_start_time, game.time_limit))
+                asyncio.create_task(trigger_edl_unlock(game.game_start_time, game.time_limit))
                 await broadcast_event({"message": "ゲームが開始されました！"})
                 await broadcast_admin()
                 for ws in game.connections:
