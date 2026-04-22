@@ -44,7 +44,7 @@ def default_questions() -> List[dict]:
         {"id": 27, "title": "ランチ亭の予約", "question": "ランチ亭の予約締め切り時間は？", "answer": "9時25分", "choices": ["9時25分", "10時25分", "10時55分"], "points": 3, "hint": "福利厚生"},
         {"id": 28, "title": "セキュリティ製品", "question": "マクニカが開発してるセキュリティ製品は？", "answer": "Macnica ASM", "choices": ["Macnica ASM", "Macnica EDR", "Macnica NET"], "points": 3, "hint": ""},
         {"id": 29, "title": "社員旅行", "question": "昨年度MNCが行った社員旅行はどこ？", "answer": "名古屋", "choices": ["名古屋", "大阪", "福岡"], "points": 3, "hint": "マクネコ"},
-        {"id": 30, "title": "EDLの正式名称", "question": "EDLの正式名称は？", "answer": "Education Development Leader", "choices": ["Education Development Leader", "Education Leader", "Education Diversity Leader"], "points": 2, "hint": ""},
+        {"id": 30, "title": "EDLの正式名称", "question": "EDLの正式名称は？", "answer": "Education Leader", "choices": ["Education Development Leader", "Education Leader", "Education Diversity Leader"], "points": 2, "hint": ""},
     ]
 
 
@@ -237,11 +237,12 @@ class QuizGame:
                 if team != EDL_TEAM:
                     self.teams[team] = max(0, self.teams[team] + 1.0)
                     bonus_msg = f"{team} が最速正解ボーナス +1点！"
-                # ランダム減点は全チーム対象（EDL含む）
-                penalty_target = random.choice(TEAMS)
-                self.random_penalty[question_id] = penalty_target
-                self.teams[penalty_target] = max(0, self.teams[penalty_target] - 1.0)
-                penalty_messages.append(f"ランダム減点: {penalty_target} が -1点！")
+                # ランダム減点: EDLが最速正解したときは発生しない
+                if team != EDL_TEAM:
+                    penalty_target = random.choice(TEAMS)
+                    self.random_penalty[question_id] = penalty_target
+                    self.teams[penalty_target] = max(0, self.teams[penalty_target] - 1.0)
+                    penalty_messages.append(f"ランダム減点: {penalty_target} が -1点！")
             self.team_status[team][question_id] = status
             result = {"success": True, "correct": True, "message": "正解！", "points_earned": earned_points, "bonus_msg": bonus_msg, "penalty_msg": " / ".join(penalty_messages) if penalty_messages else None}
             # EDLフェーズ1全解答チェック
