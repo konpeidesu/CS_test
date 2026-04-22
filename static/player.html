@@ -134,8 +134,8 @@ body{font-family:'Segoe UI','Hiragino Sans',sans-serif;background:linear-gradien
     </div>
   </div>
 </div>
-/* EDL_PASSWORD: edl20260423 -->
-<div class="end-overlay" id="endOverlay"><div class="end-box"><div class="end-title">終了</div><div class="end-sub">制限時間です。回答できません。</div></div></div>
+<!-- EDL_PASSWORD: edl20260423 -->
+<div class="end-overlay"id="endOverlay"><div class="end-box"><div class="end-title">終了</div><div class="end-sub">制限時間です。回答できません。</div></div></div>
 <script>
 const TEAMS=["A-1","A-2","B-1","B-2","C-1","C-2","EDL"];
 const EDL_TEAM="EDL";
@@ -161,7 +161,7 @@ function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classL
 function updateHeader(){if(!gameState)return;document.getElementById('headerScore').textContent=gameState.score.toFixed(1)+' pt';}
 function requestState(){if(ws&&myTeam)ws.send(JSON.stringify({type:'get_state',team:myTeam}));}
 function isAnswerLocked(){return !!(gameState&&gameState.game_state!=='running');}
-function updateEndOverlay(){const overlay=document.getElementById('endOverlay');overlay.classList.toggle('active',isAnswerLocked());}
+function updateEndOverlay(){const overlay=document.getElementById('endOverlay');const onWaiting=document.getElementById('screenWaiting').classList.contains('active');overlay.classList.toggle('active',!onWaiting&&isAnswerLocked());}
 function syncPlayerTimer(){if(playerTimerInterval){clearInterval(playerTimerInterval);playerTimerInterval=null;}if(!gameState||gameState.game_state!=='running'||gameState.remaining_seconds==null)return;
 let rem=Math.max(0,Math.floor(gameState.remaining_seconds));playerTimerInterval=setInterval(()=>{rem-=1;if(!gameState)return;if(rem<=0){clearInterval(playerTimerInterval);playerTimerInterval=null;forceEndedState();return;}gameState.remaining_seconds=rem;renderScoreBar();},1000);}
 function forceEndedState(){if(playerTimerInterval){clearInterval(playerTimerInterval);playerTimerInterval=null;}if(!gameState){gameState={score:0,teams:{},questions:[],game_state:'ended',game_started:false,remaining_seconds:0};}
