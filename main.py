@@ -63,6 +63,8 @@ class QuizGame:
         self.comeback_bonus_applied: bool = False
         self.comeback_bonus: Dict[str, Dict[int, float]] = {t: {} for t in TEAMS}
         self.edl_unlocked_qids: set = set()  # EDL解放済み問題ID
+        self.edl_phase1_qids: set = set()    # EDL開始時解放問題ID（フェーズ1）
+        self.edl_hard_unlocked: bool = False  # フェーズ2解放済みフラグ
 
     @property
     def game_started(self):
@@ -74,15 +76,30 @@ class QuizGame:
         q3 = [q["id"] for q in self.questions if q["points"] == 3]
         random.shuffle(q3)
         half3 = q3[:len(q3) // 2]
-        self.edl_unlocked_qids = set(q2) | set(half3)
+        self.edl_phase1_qids = set(q2) | set(half3)
+        self.edl_unlocked_qids = set(self.edl_phase1_qids)
+        self.edl_hard_unlocked = False
 
     def unlock_edl_hard_questions(self):
-        """残り時間半分時に3点問題の残り半分+4点問題を解放"""
+        """3点問題の残り半分+4点問題を解放（タイマー半分 or フェーズ1全解答時）"""
+        if self.edl_hard_unlocked:
+            return []
+        self.edl_hard_unlocked = True
         q3_all = set(q["id"] for q in self.questions if q["points"] == 3)
         q4_all = set(q["id"] for q in self.questions if q["points"] == 4)
         newly_unlocked = (q3_all | q4_all) - self.edl_unlocked_qids
         self.edl_unlocked_qids |= q3_all | q4_all
         return list(newly_unlocked)
+
+    def check_edl_phase1_complete(self):
+        """EDLのフェーズ1問題が全て解答済みかチェック。解放済みでなければTrueを返す"""
+        if self.edl_hard_unlocked:
+            return False
+        for qid in self.edl_phase1_qids:
+            st = self.team_status[EDL_TEAM].get(qid, {})
+            if not st.get("solved", False):
+                return False
+        return True
 
     def is_edl_question_locked(self, question_id):
         """EDLチームにとってこの問題がロック中かどうか"""
@@ -214,7 +231,12 @@ class QuizGame:
                 self.teams[penalty_target] = max(0, self.teams[penalty_target] - 1.0)
                 penalty_messages.append(f"ランダム減点: {penalty_target} が -1点！")
             self.team_status[team][question_id] = status
-            return {"success": True, "correct": True, "message": "正解！", "points_earned": earned_points, "bonus_msg": bonus_msg, "penalty_msg": " / ".join(penalty_messages) if penalty_messages else None}
+            result = {"success": True, "correct": True, "message": "正解！", "points_earned": earned_points, "bonus_msg": bonus_msg, "penalty_msg": " / ".join(penalty_messages) if penalty_messages else None}
+            # EDLフェーズ1全解答チェック
+            if team == EDL_TEAM and self.check_edl_phase1_complete():
+                newly = self.unlock_edl_hard_questions()
+                result["edl_phase2_unlocked"] = newly
+            return result
         # 誤答: EDLは-5点、他は-0.5点
         status["wrong_count"] += 1
         penalty = 5.0 if team == EDL_TEAM else 0.5
@@ -368,6 +390,16 @@ async def player_ws(websocket: WebSocket):
                 await websocket.send_text(json.dumps({"type": "answer_result", "data": result}, ensure_ascii=False))
                 if result.get("bonus_msg") or result.get("penalty_msg"):
                     await broadcast_event({"bonus_msg": result.get("bonus_msg"), "penalty_msg": result.get("penalty_msg")})
+                # EDLフェーズ1全解答で即時解放
+                if result.get("edl_phase2_unlocked") is not None:
+                    newly = result["edl_phase2_unlocked"]
+                    await broadcast_event({"message": "🔓 EDLチームがフェーズ1全解答！3点問題の残り + 4点問題が解放されました！"})
+                    for ws in game.connections:
+                        try:
+                            await ws.send_text(json.dumps({"type": "edl_unlocked", "unlocked_qids": newly}, ensure_ascii=False))
+                        except Exception:
+                            pass
+                    await broadcast_admin()
                 await broadcast_scores()
                 await broadcast_admin()
                 state = game.get_team_state(msg["team"])
