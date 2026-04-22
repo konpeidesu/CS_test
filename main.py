@@ -111,17 +111,36 @@ class QuizGame:
                 continue
             target_count = max(1, math.floor(0.3 * len(unanswered)))
             target_count = min(target_count, len(unanswered))
-            shuffled = list(unanswered)
-            random.shuffle(shuffled)
-            sorted_candidates = sorted(shuffled, key=lambda q: q["points"])
             selected = []
             base_total = 0
             for candidate_count in range(target_count, 0, -1):
-                candidate_selected = sorted_candidates[:candidate_count]
-                candidate_base_total = sum(q["points"] for q in candidate_selected)
-                if candidate_base_total < target_total_points:
-                    selected = candidate_selected
-                    base_total = candidate_base_total
+                max_trials = min(80, max(20, len(unanswered) * 4))
+                if len(unanswered) <= candidate_count:
+                    candidate_pool = [list(unanswered)]
+                else:
+                    candidate_pool = [random.sample(unanswered, candidate_count) for _ in range(max_trials)]
+                best_selected = None
+                best_score = None
+                best_base_total = 0
+                for candidate_selected in candidate_pool:
+                    candidate_base_total = sum(q["points"] for q in candidate_selected)
+                    if candidate_base_total >= target_total_points:
+                        continue
+                    point_buckets = {}
+                    for question in candidate_selected:
+                        point_buckets[question["points"]] = point_buckets.get(question["points"], 0) + 1
+                    spread_score = (
+                        len(point_buckets),
+                        -max(point_buckets.values()),
+                        candidate_base_total,
+                    )
+                    if best_score is None or spread_score > best_score:
+                        best_selected = candidate_selected
+                        best_score = spread_score
+                        best_base_total = candidate_base_total
+                if best_selected is not None:
+                    selected = best_selected
+                    base_total = best_base_total
                     break
             if not selected:
                 continue
