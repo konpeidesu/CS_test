@@ -106,17 +106,33 @@ class QuizGame:
             ]
             if not unanswered:
                 continue
+            target_total_points = gap - 3
+            if target_total_points <= 0:
+                continue
             target_count = max(1, math.floor(0.3 * len(unanswered)))
             target_count = min(target_count, len(unanswered))
-            final_points = max(0, gap - 3) / target_count
-            selected = random.sample(unanswered, target_count)
+            shuffled = list(unanswered)
+            random.shuffle(shuffled)
+            sorted_candidates = sorted(shuffled, key=lambda q: q["points"])
+            selected = []
+            base_total = 0
+            for candidate_count in range(target_count, 0, -1):
+                candidate_selected = sorted_candidates[:candidate_count]
+                candidate_base_total = sum(q["points"] for q in candidate_selected)
+                if candidate_base_total < target_total_points:
+                    selected = candidate_selected
+                    base_total = candidate_base_total
+                    break
+            if not selected:
+                continue
+            bonus_points = (target_total_points - base_total) / len(selected)
             for q in selected:
-                self.comeback_bonus[team][q["id"]] = final_points
+                self.comeback_bonus[team][q["id"]] = q["points"] + bonus_points
             applied.append({
                 "team": team,
                 "gap": gap,
-                "count": target_count,
-                "points": final_points,
+                "count": len(selected),
+                "points": bonus_points,
                 "question_ids": [q["id"] for q in selected],
             })
         return applied
