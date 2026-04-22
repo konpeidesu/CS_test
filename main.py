@@ -124,7 +124,7 @@ class QuizGame:
                 best_base_total = 0
                 for candidate_selected in candidate_pool:
                     candidate_base_total = sum(q["points"] for q in candidate_selected)
-                    if candidate_base_total >= target_total_points:
+                    if candidate_base_total > target_total_points - candidate_count:
                         continue
                     point_buckets = {}
                     for question in candidate_selected:
@@ -145,6 +145,8 @@ class QuizGame:
             if not selected:
                 continue
             bonus_points = (target_total_points - base_total) / len(selected)
+            if bonus_points < 1:
+                continue
             for q in selected:
                 self.comeback_bonus[team][q["id"]] = q["points"] + bonus_points
             applied.append({
