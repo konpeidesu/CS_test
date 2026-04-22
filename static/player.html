@@ -86,6 +86,16 @@ body{font-family:'Segoe UI','Hiragino Sans',sans-serif;background:linear-gradien
 .toast{position:fixed;top:70px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.9);padding:12px 25px;border-radius:10px;z-index:200;display:none;text-align:center;border:1px solid #ffd700;max-width:90%}
 .toast.show{display:block;animation:fadeInOut 4s}
 @keyframes fadeInOut{0%{opacity:0}10%{opacity:1}80%{opacity:1}100%{opacity:0}}
+/* EDL password modal */
+.pw-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;display:flex;align-items:center;justify-content:center}
+.pw-modal{background:linear-gradient(135deg,#1a0a0a,#2d1010);border:2px solid #e74c3c;border-radius:20px;padding:36px 32px;width:min(90vw,420px);text-align:center;box-shadow:0 0 40px rgba(231,76,60,.4)}
+.pw-modal h2{font-size:1.5em;color:#ff6b6b;margin-bottom:6px}
+.pw-modal p{color:#aaa;font-size:.9em;margin-bottom:24px}
+.pw-input{width:100%;padding:14px 18px;border-radius:10px;border:2px solid rgba(231,76,60,.5);background:rgba(255,255,255,.06);color:#fff;font-size:1.2em;text-align:center;letter-spacing:.2em;outline:none;margin-bottom:8px}
+.pw-input:focus{border-color:#e74c3c}
+.pw-error{color:#e74c3c;font-size:.9em;min-height:1.2em;margin-bottom:16px}
+.pw-modal-btns{display:flex;gap:12px;justify-content:center}
+.pw-modal-btns .btn{min-width:110px}
 .waiting-box{text-align:center;margin-top:80px}
 .waiting-box .emoji{font-size:4em;animation:bounce 2s infinite}
 @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-15px)}}
@@ -109,10 +119,28 @@ body{font-family:'Segoe UI','Hiragino Sans',sans-serif;background:linear-gradien
 <div class="screen" id="screenDetail"><div class="detail-back" onclick="backToList()">← 問題一覧に戻る</div><div class="detail-card" id="detailCard"></div></div>
 </div>
 <div class="toast" id="toast"></div>
+<!-- EDL password modal (hidden from normal view; password visible in source) -->
+<div id="pwModal" style="display:none">
+  <div class="pw-modal-backdrop">
+    <div class="pw-modal">
+      <h2>🔴 EDL チーム</h2>
+      <p>EDLチームはパスワードが必要です<br>先輩社員のみアクセスできます</p>
+      <input type="password" class="pw-input" id="pwInput" placeholder="パスワードを入力" autocomplete="off">
+      <div class="pw-error" id="pwError"></div>
+      <div class="pw-modal-btns">
+        <button class="btn btn-secondary" onclick="closePwModal()">← 戻る</button>
+        <button class="btn btn-primary" onclick="submitPw()" id="pwSubmitBtn">確認 →</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- EDL_PASSWORD: edl2025 -->
 <div class="end-overlay" id="endOverlay"><div class="end-box"><div class="end-title">終了</div><div class="end-sub">制限時間です。回答できません。</div></div></div>
 <script>
 const TEAMS=["A-1","A-2","B-1","B-2","C-1","C-2","EDL"];
 const EDL_TEAM="EDL";
+/* EDL team password (intentionally visible in source) */
+const EDL_PASSWORD="edl2025";
 const teamColors=['#f5576c','#4facfe','#43e97b','#fee140','#a18cd1','#fccb90','#ff9f43'];
 let ws,myTeam=null,gameState=null,currentQid=null,allScores={},playerTimerInterval=null;
 const SCORE_HIDE_THRESHOLD_SECONDS=180;
@@ -140,7 +168,29 @@ function forceEndedState(){if(playerTimerInterval){clearInterval(playerTimerInte
 gameState.game_state='ended';gameState.game_started=false;gameState.remaining_seconds=0;updateEndOverlay();renderList();if(document.getElementById('screenDetail').classList.contains('active'))renderEndedDetail();}
 const grid=document.getElementById('teamGrid');
 TEAMS.forEach(t=>{const b=document.createElement('button');b.className='team-btn';b.textContent=t;b.onclick=()=>selectTeam(t);grid.appendChild(b);});
-function selectTeam(t){myTeam=t;document.getElementById('confirmTeamName').textContent=t;showScreen('screenConfirm');}
+function selectTeam(t){
+  if(t===EDL_TEAM){openPwModal(t);return;}
+  myTeam=t;document.getElementById('confirmTeamName').textContent=t;showScreen('screenConfirm');}
+function openPwModal(t){
+  document.getElementById('pwModal').style.display='block';
+  document.getElementById('pwInput').value='';
+  document.getElementById('pwError').textContent='';
+  document.getElementById('pwModal')._pendingTeam=t;
+  setTimeout(()=>document.getElementById('pwInput').focus(),100);}
+function closePwModal(){
+  document.getElementById('pwModal').style.display='none';}
+function submitPw(){
+  const val=document.getElementById('pwInput').value;
+  const t=document.getElementById('pwModal')._pendingTeam;
+  if(val===EDL_PASSWORD){
+    closePwModal();
+    myTeam=t;document.getElementById('confirmTeamName').textContent=t;showScreen('screenConfirm');
+  }else{
+    document.getElementById('pwError').textContent='❌ パスワードが違います';
+    document.getElementById('pwInput').value='';
+    document.getElementById('pwInput').focus();}}
+// Enterキーでパスワード送信
+document.addEventListener('keydown',function(e){if(e.key==='Enter'&&document.getElementById('pwModal').style.display==='block')submitPw();});
 function backToSelect(){myTeam=null;showScreen('screenSelect');}
 function confirmTeam(){document.getElementById('teamInfo').style.display='flex';document.getElementById('headerTeam').textContent='👥 '+myTeam;requestState();showScreen('screenWaiting');}
 function renderScoreBar(){const bar=document.getElementById('scoreBarTop');if(!bar||!gameState)return;
