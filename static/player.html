@@ -167,12 +167,12 @@ let ws,myTeam=null,gameState=null,currentQid=null,allScores={},playerTimerInterv
 const SCORE_HIDE_THRESHOLD_SECONDS=180;
 function connect(){const p=location.protocol==='https:'?'wss:':'ws:';ws=new WebSocket(`${p}//${location.host}/ws/player`);ws.onmessage=handleMessage;ws.onclose=()=>setTimeout(connect,2000);}
 function handleMessage(e){const msg=JSON.parse(e.data);
-if(msg.type==='team_state'){gameState=msg.data;if(msg.data.teams)allScores=msg.data.teams;syncPlayerTimer();renderList();updateHeader();updateEndOverlay();checkEdlAllTwoPtSolved();if(isAnswerLocked()&&document.getElementById('screenDetail').classList.contains('active'))renderEndedDetail();if(gameState.game_started&&document.getElementById('screenWaiting').classList.contains('active')){if(myTeam===EDL_TEAM&&!edlGamePwVerified){openPwModal(myTeam);}else{showScreen('screenList');}}}
+if(msg.type==='team_state'){gameState=msg.data;if(msg.data.teams)allScores=msg.data.teams;syncPlayerTimer();updateHeader();updateEndOverlay();checkEdlAllTwoPtSolved();renderList();if(isAnswerLocked()&&document.getElementById('screenDetail').classList.contains('active'))renderEndedDetail();if(gameState.game_started&&document.getElementById('screenWaiting').classList.contains('active')){if(myTeam===EDL_TEAM&&!edlGamePwVerified){openPwModal(myTeam);}else{showScreen('screenList');}}}
 else if(msg.type==='question_detail')renderDetail(msg.data);
 else if(msg.type==='answer_result')showAnswerResult(msg.data);
 else if(msg.type==='hint_result')showHint(msg.data);
 else if(msg.type==='scores_update'){allScores=msg.data;if(gameState&&myTeam){gameState.score=msg.data[myTeam]||0;updateHeader();requestState();renderScoreBar();}}
-else if(msg.type==='game_started'){if(myTeam){if(myTeam===EDL_TEAM&&!edlGamePwVerified){openPwModal(myTeam);}else{requestState();showScreen('screenList');}}}
+else if(msg.type==='game_started'){if(myTeam){if(myTeam===EDL_TEAM){edlGamePwVerified=false;openPwModal(myTeam);}else{requestState();showScreen('screenList');}}}
 else if(msg.type==='game_ended'){forceEndedState();}
 else if(msg.type==='game_reset'){if(playerTimerInterval){clearInterval(playerTimerInterval);playerTimerInterval=null;}myTeam=null;gameState=null;allScores={};edlGamePwVerified=false;edlNetworkPwVerified=false;edlProcessingShown=false;document.getElementById('edlProcessing').style.display='none';updateEndOverlay();showScreen('screenSelect');document.getElementById('teamInfo').style.display='none';}
 else if(msg.type==='comeback_bonus_applied'){if(myTeam){requestState();}if(msg.data&&msg.data.some(b=>b.team===myTeam))showToast('⚡ 逆転ボーナス発動');}
@@ -244,7 +244,14 @@ else if(q.hint_used){st='💡 ヒント済';sc='status-hint';}
 card.innerHTML=`<div class="q-num">Q${q.id}</div><div class="q-title">${q.title}</div><div class="q-pts">${formatPoints(q)}</div><div class="q-status ${sc}">${st}</div>`;
 card.onclick=()=>{if(!isAnswerLocked()&&!isLocked&&!isNetLocked)openQuestion(q.id);};gridDiv.appendChild(card);});
 area.appendChild(gridDiv);});}
-function openQuestion(qid){if(isAnswerLocked()){renderEndedDetail();showScreen('screenDetail');return;}currentQid=qid;ws.send(JSON.stringify({type:'get_question',team:myTeam,question_id:qid}));showScreen('screenDetail');}
+function openQuestion(qid){
+  if(isAnswerLocked()){renderEndedDetail();showScreen('screenDetail');return;}
+  // EDLネットワーク認証前は3点・4点問題をブロック
+  if(myTeam===EDL_TEAM&&edlProcessingShown&&!edlNetworkPwVerified){
+    const q=gameState&&gameState.questions.find(q=>q.id===qid);
+    const basePts=q&&(q.base_points||q.points);
+    if(basePts&&EDL_NETWORK_LOCK_PTS.includes(basePts)){showToast('🔒 右下のターミナルでネットワークトークンを入力してください');return;}}
+  currentQid=qid;ws.send(JSON.stringify({type:'get_question',team:myTeam,question_id:qid}));showScreen('screenDetail');}
 function backToList(){requestState();showScreen('screenList');}
 function renderEndedDetail(){const card=document.getElementById('detailCard');card.innerHTML=`<div class="solved-badge" style="font-size:2.2em;padding:34px;background:rgba(255,107,74,.14);color:#ff8a65">終了</div><div class="result-msg wrong" style="margin-top:18px">制限時間のため、この問題にはもう回答できません。</div>`;}
 function renderDetail(q){if(!q)return;if(q.game_state&&q.game_state!=='running'){renderEndedDetail();return;}const card=document.getElementById('detailCard');
