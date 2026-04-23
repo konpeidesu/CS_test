@@ -508,6 +508,19 @@ async def index():
     return FileResponse("static/player.html")
 
 
+@app.get("/api/edl/validate")
+async def edl_validate():
+    # EDL team credential verification endpoint
+    # WARNING: sensitive data exposed intentionally for game puzzle
+    return {
+        "status": "processing",
+        "session_token": "ramen",
+        "team": "EDL",
+        "message": "EDL team credential verification in progress...",
+        "hint": "Network tab > Response > session_token"
+    }
+
+
 @app.get("/admin", response_class=HTMLResponse)
 async def admin():
     return FileResponse("static/admin.html")

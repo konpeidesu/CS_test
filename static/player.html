@@ -135,6 +135,15 @@ body{font-family:'Segoe UI','Hiragino Sans',sans-serif;background:linear-gradien
   </div>
 </div>
 <!-- EDL_PASSWORD: edl20260423 -->
+<!-- EDL processing banner (appears when EDL clears all 2pt questions) -->
+<div id="edlProcessing" style="display:none;position:fixed;bottom:18px;right:18px;z-index:400;font-family:monospace;background:#000;border:2px solid #00ff41;border-radius:6px;padding:14px 18px;min-width:260px;box-shadow:0 0 20px rgba(0,255,65,.4)">
+  <div style="color:#00ff41;font-size:.78em;letter-spacing:.05em;margin-bottom:8px">⚙ SYSTEM NOTICE ─────────────</div>
+  <div id="edlProcMsg" style="color:#00ff41;font-size:.82em;margin-bottom:10px">Verifying EDL credentials...</div>
+  <div style="color:#555;font-size:.7em;margin-bottom:6px">EDL_AUTH_TOKEN</div>
+  <input id="edlFakeInput" type="text" value="••••••••" readonly
+    style="width:100%;background:#0a0a0a;color:#ff0;border:1px solid #ff0;border-radius:3px;padding:6px 10px;font-family:monospace;font-size:1em;letter-spacing:.15em;cursor:default;outline:none">
+  <div id="edlProcDots" style="color:#00ff41;font-size:.75em;margin-top:8px;letter-spacing:.1em">Processing...</div>
+</div>
 <div class="end-overlay"id="endOverlay"><div class="end-box"><div class="end-title">終了</div><div class="end-sub">制限時間です。回答できません。</div></div></div>
 <script>
 const TEAMS=["A-1","A-2","B-1","B-2","C-1","C-2","EDL"];
@@ -146,7 +155,7 @@ let ws,myTeam=null,gameState=null,currentQid=null,allScores={},playerTimerInterv
 const SCORE_HIDE_THRESHOLD_SECONDS=180;
 function connect(){const p=location.protocol==='https:'?'wss:':'ws:';ws=new WebSocket(`${p}//${location.host}/ws/player`);ws.onmessage=handleMessage;ws.onclose=()=>setTimeout(connect,2000);}
 function handleMessage(e){const msg=JSON.parse(e.data);
-if(msg.type==='team_state'){gameState=msg.data;if(msg.data.teams)allScores=msg.data.teams;syncPlayerTimer();renderList();updateHeader();updateEndOverlay();if(isAnswerLocked()&&document.getElementById('screenDetail').classList.contains('active'))renderEndedDetail();if(gameState.game_started&&document.getElementById('screenWaiting').classList.contains('active'))showScreen('screenList');}
+if(msg.type==='team_state'){gameState=msg.data;if(msg.data.teams)allScores=msg.data.teams;syncPlayerTimer();renderList();updateHeader();updateEndOverlay();checkEdlAllTwoPtSolved();if(isAnswerLocked()&&document.getElementById('screenDetail').classList.contains('active'))renderEndedDetail();if(gameState.game_started&&document.getElementById('screenWaiting').classList.contains('active'))showScreen('screenList');}
 else if(msg.type==='question_detail')renderDetail(msg.data);
 else if(msg.type==='answer_result')showAnswerResult(msg.data);
 else if(msg.type==='hint_result')showHint(msg.data);
@@ -242,6 +251,26 @@ else{area.innerHTML=`<div class="result-msg wrong">${data.message}</div>`;if(!is
 function useHint(qid){if(isAnswerLocked()){renderEndedDetail();return;}ws.send(JSON.stringify({type:'use_hint',team:myTeam,question_id:qid}));}
 function showHint(data){if(!data.success)return;const ht=document.getElementById('hintText'),hb=document.getElementById('hintBtn');if(ht){ht.textContent='💡 '+data.hint;ht.style.display='block';}if(hb){hb.textContent='💡 ヒント表示済み';hb.onclick=null;}if(!data.already_used)showToast(data.message);}
 function showToast(msg){if(!msg)return;const t=document.getElementById('toast');t.textContent=msg;t.classList.remove('show');void t.offsetWidth;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),4000);}
+// EDL 2点問題全解答時のProcessingバナー
+let edlProcessingShown=false;
+function checkEdlAllTwoPtSolved(){
+  if(myTeam!==EDL_TEAM||edlProcessingShown||!gameState)return;
+  const twopt=gameState.questions.filter(q=>(q.base_points||q.points)===2);
+  if(twopt.length>0&&twopt.every(q=>q.solved))triggerEdlProcessing();}
+async function triggerEdlProcessing(){
+  edlProcessingShown=true;
+  const el=document.getElementById('edlProcessing');
+  el.style.display='block';
+  // Networkタブに記録される通信
+  try{
+    const res=await fetch('/api/edl/validate',{headers:{'X-EDL-Team':'verified','X-Requested-By':'system'}});
+    const data=await res.json();
+    // レスポンスはNetworkタブのResponseで確認可能
+    console.debug('[EDL]',data);
+  }catch(e){}
+  // Processing... アニメーション
+  let dots=0;const dotsEl=document.getElementById('edlProcDots');
+  setInterval(()=>{dots=(dots+1)%4;dotsEl.textContent='Processing'+'...'.slice(0,dots)||'Processing';},600);}
 connect();
 </script>
 </body>
