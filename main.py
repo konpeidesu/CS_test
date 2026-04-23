@@ -136,9 +136,6 @@ class QuizGame:
         q = next((qn for qn in self.questions if qn["id"] == question_id), None)
         if not q:
             return 0
-        # EDLチームは2点問題が1点
-        if team == EDL_TEAM and q["points"] == 2:
-            return 1
         return q["points"]
 
     def apply_comeback_bonus(self):
@@ -231,6 +228,15 @@ class QuizGame:
             self.teams[team] = max(0, self.teams[team] + earned_points)
             bonus_msg = None
             penalty_messages = []
+            # EDLが2点問題を正解: 25%の確率で得点を獲得できず、代わりにランダムな他チームが獲得
+            edl_2pt_stolen = False
+            if team == EDL_TEAM and q["points"] == 2 and random.random() < 0.25:
+                self.teams[team] = max(0, self.teams[team] - earned_points)
+                other_teams = [t for t in TEAMS if t != EDL_TEAM]
+                steal_target = random.choice(other_teams)
+                self.teams[steal_target] = max(0, self.teams[steal_target] + earned_points)
+                penalty_messages.append(f"😈 EDLの2点が {steal_target} に横取りされた！")
+                edl_2pt_stolen = True
             if question_id not in self.first_solver:
                 self.first_solver[question_id] = team
                 # EDLは最速ボーナス(+1点)なし、ただしランダム減点対象にはなる
@@ -244,7 +250,7 @@ class QuizGame:
                     self.teams[penalty_target] = max(0, self.teams[penalty_target] - 1.0)
                     penalty_messages.append(f"ランダム減点: {penalty_target} が -1点！")
             self.team_status[team][question_id] = status
-            result = {"success": True, "correct": True, "message": "正解！", "points_earned": earned_points, "bonus_msg": bonus_msg, "penalty_msg": " / ".join(penalty_messages) if penalty_messages else None}
+            result = {"success": True, "correct": True, "message": "正解！" if not edl_2pt_stolen else "正解！（でも得点を横取りされました…）", "points_earned": earned_points if not edl_2pt_stolen else 0, "bonus_msg": bonus_msg, "penalty_msg": " / ".join(penalty_messages) if penalty_messages else None}
             # EDLフェーズ1全解答チェック
             if team == EDL_TEAM and self.check_edl_phase1_complete():
                 newly = self.unlock_edl_hard_questions()
