@@ -260,7 +260,7 @@ if(q.locked){card.innerHTML=`<div class="d-num">Q${q.id}</div><div class="d-titl
 if(q.solved){card.innerHTML=`<div class="d-num">Q${q.id}</div><div class="d-title">${q.title}</div><div class="${ptsClass}">${formatPoints(q)}</div><div class="d-question">${q.question}</div><div class="solved-badge">✅ 正解済み</div>`;return;}
 // EDLチームはヒントボタンを表示しない
 let hh='';if(q.has_hint&&myTeam!==EDL_TEAM){const label=q.hint_used?'💡 ヒントを見る (表示済み)':'💡 ヒントを見る (-1点)';hh=`<div class="hint-area"><button class="hint-btn" id="hintBtn" onclick="useHint(${q.id})">${label}</button><div class="hint-text" id="hintText" style="display:none"></div></div>`;}
-const edlBadge=myTeam===EDL_TEAM?`<span class="edl-badge">EDL: 誤答-5点</span>`:'';
+const edlBadge=myTeam===EDL_TEAM?`<span class="edl-badge">EDL: 誤答-6点</span>`:'';
 let choicesHtml='';if(q.choices&&q.choices.length){choicesHtml='<div class="answer-area" id="choicesArea"></div>';}
 card.innerHTML=`<div class="d-num">Q${q.id}</div><div class="d-title">${q.title}${edlBadge}</div><div class="${ptsClass}">${formatPoints(q)}</div><div class="d-question">${q.question}</div>${hh}${choicesHtml}<div id="resultArea"></div>`;
 if(q.choices&&q.choices.length){const ca=document.getElementById('choicesArea');q.choices.forEach(c=>{const btn=document.createElement('button');btn.className='choice-btn';btn.textContent=c;btn.onclick=function(){submitChoice(q.id,btn,c);};ca.appendChild(btn);});}

@@ -261,9 +261,9 @@ class QuizGame:
                     self.teams[EDL_TEAM] = max(0, self.teams[EDL_TEAM] + 5.0)
                     result["edl_early_bonus"] = True
             return result
-        # 誤答: EDLは-5点、他は-0.5点
+        # 誤答: EDLは-6点、他は-0.5点
         status["wrong_count"] += 1
-        penalty = 5.0 if team == EDL_TEAM else 0.5
+        penalty = 6.0 if team == EDL_TEAM else 0.5
         self.teams[team] = max(0, self.teams[team] - penalty)
         self.team_status[team][question_id] = status
         msg = f"不正解... (-{penalty:.1g}点) 誤答回数: {status['wrong_count']}"
