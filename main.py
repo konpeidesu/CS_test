@@ -230,7 +230,7 @@ class QuizGame:
             penalty_messages = []
             # EDLが2点問題を正解: 25%の確率で得点を獲得できず、代わりにランダムな他チームが獲得
             edl_2pt_stolen = False
-            if team == EDL_TEAM and q["points"] == 2 and random.random() < 0.25:
+            if team == EDL_TEAM and q["points"] == 2 and random.random() < 0.10:
                 self.teams[team] = max(0, self.teams[team] - earned_points)
                 other_teams = [t for t in TEAMS if t != EDL_TEAM]
                 steal_target = random.choice(other_teams)

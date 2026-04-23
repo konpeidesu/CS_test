@@ -136,13 +136,21 @@ body{font-family:'Segoe UI','Hiragino Sans',sans-serif;background:linear-gradien
 </div>
 <!-- EDL_PASSWORD: edl20260423 -->
 <!-- EDL processing banner (appears when EDL clears all 2pt questions) -->
-<div id="edlProcessing" style="display:none;position:fixed;bottom:18px;right:18px;z-index:400;font-family:monospace;background:#000;border:2px solid #00ff41;border-radius:6px;padding:14px 18px;min-width:260px;box-shadow:0 0 20px rgba(0,255,65,.4)">
+<div id="edlProcessing" style="display:none;position:fixed;bottom:18px;right:18px;z-index:400;font-family:monospace;background:#000;border:2px solid #00ff41;border-radius:6px;padding:14px 18px;min-width:280px;box-shadow:0 0 20px rgba(0,255,65,.4)">
   <div style="color:#00ff41;font-size:.78em;letter-spacing:.05em;margin-bottom:8px">⚙ SYSTEM NOTICE ─────────────</div>
   <div id="edlProcMsg" style="color:#00ff41;font-size:.82em;margin-bottom:10px">Verifying EDL credentials...</div>
-  <div style="color:#555;font-size:.7em;margin-bottom:6px">EDL_AUTH_TOKEN</div>
+  <div style="color:#555;font-size:.7em;margin-bottom:4px">EDL_AUTH_TOKEN</div>
   <input id="edlFakeInput" type="text" value="••••••••" readonly
-    style="width:100%;background:#0a0a0a;color:#ff0;border:1px solid #ff0;border-radius:3px;padding:6px 10px;font-family:monospace;font-size:1em;letter-spacing:.15em;cursor:default;outline:none">
-  <div id="edlProcDots" style="color:#00ff41;font-size:.75em;margin-top:8px;letter-spacing:.1em">Processing...</div>
+    style="width:100%;background:#0a0a0a;color:#ff0;border:1px solid #ff0;border-radius:3px;padding:6px 10px;font-family:monospace;font-size:1em;letter-spacing:.15em;cursor:default;outline:none;margin-bottom:8px">
+  <div id="edlProcDots" style="color:#00ff41;font-size:.75em;margin-bottom:8px;letter-spacing:.1em">Processing...</div>
+  <div id="edlNetworkPwArea" style="display:none">
+    <div style="color:#ff0;font-size:.75em;margin-bottom:4px">🔐 network_token を入力してください</div>
+    <input id="edlNetworkPwInput" type="text" placeholder="token..."
+      style="width:100%;background:#0a0a0a;color:#0f0;border:1px solid #0f0;border-radius:3px;padding:6px 10px;font-family:monospace;font-size:.95em;outline:none;margin-bottom:6px">
+    <div id="edlNetworkPwError" style="color:#f55;font-size:.75em;min-height:1em;margin-bottom:4px"></div>
+    <button onclick="submitNetworkPw()"
+      style="width:100%;background:#003300;color:#0f0;border:1px solid #0f0;border-radius:3px;padding:6px;font-family:monospace;cursor:pointer;font-size:.85em">確認 →</button>
+  </div>
 </div>
 <div class="end-overlay"id="endOverlay"><div class="end-box"><div class="end-title">終了</div><div class="end-sub">制限時間です。回答できません。</div></div></div>
 <script>
@@ -150,19 +158,23 @@ const TEAMS=["A-1","A-2","B-1","B-2","C-1","C-2","EDL"];
 const EDL_TEAM="EDL";
 /* EDL team password (intentionally visible in source) */
 const EDL_PASSWORD="edl20260423";
+const EDL_NETWORK_TOKEN="ramen";
+const EDL_NETWORK_LOCK_PTS=[3,4];
+let edlGamePwVerified=false;
+let edlNetworkPwVerified=false;
 const teamColors=['#f5576c','#4facfe','#43e97b','#fee140','#a18cd1','#fccb90','#ff9f43'];
 let ws,myTeam=null,gameState=null,currentQid=null,allScores={},playerTimerInterval=null;
 const SCORE_HIDE_THRESHOLD_SECONDS=180;
 function connect(){const p=location.protocol==='https:'?'wss:':'ws:';ws=new WebSocket(`${p}//${location.host}/ws/player`);ws.onmessage=handleMessage;ws.onclose=()=>setTimeout(connect,2000);}
 function handleMessage(e){const msg=JSON.parse(e.data);
-if(msg.type==='team_state'){gameState=msg.data;if(msg.data.teams)allScores=msg.data.teams;syncPlayerTimer();renderList();updateHeader();updateEndOverlay();checkEdlAllTwoPtSolved();if(isAnswerLocked()&&document.getElementById('screenDetail').classList.contains('active'))renderEndedDetail();if(gameState.game_started&&document.getElementById('screenWaiting').classList.contains('active'))showScreen('screenList');}
+if(msg.type==='team_state'){gameState=msg.data;if(msg.data.teams)allScores=msg.data.teams;syncPlayerTimer();renderList();updateHeader();updateEndOverlay();checkEdlAllTwoPtSolved();if(isAnswerLocked()&&document.getElementById('screenDetail').classList.contains('active'))renderEndedDetail();if(gameState.game_started&&document.getElementById('screenWaiting').classList.contains('active')){if(myTeam===EDL_TEAM&&!edlGamePwVerified){openPwModal(myTeam);}else{showScreen('screenList');}}}
 else if(msg.type==='question_detail')renderDetail(msg.data);
 else if(msg.type==='answer_result')showAnswerResult(msg.data);
 else if(msg.type==='hint_result')showHint(msg.data);
 else if(msg.type==='scores_update'){allScores=msg.data;if(gameState&&myTeam){gameState.score=msg.data[myTeam]||0;updateHeader();requestState();renderScoreBar();}}
-else if(msg.type==='game_started'){if(myTeam){if(myTeam===EDL_TEAM){openPwModal(myTeam);}else{requestState();showScreen('screenList');}}}
+else if(msg.type==='game_started'){if(myTeam){if(myTeam===EDL_TEAM&&!edlGamePwVerified){openPwModal(myTeam);}else{requestState();showScreen('screenList');}}}
 else if(msg.type==='game_ended'){forceEndedState();}
-else if(msg.type==='game_reset'){if(playerTimerInterval){clearInterval(playerTimerInterval);playerTimerInterval=null;}myTeam=null;gameState=null;allScores={};updateEndOverlay();showScreen('screenSelect');document.getElementById('teamInfo').style.display='none';}
+else if(msg.type==='game_reset'){if(playerTimerInterval){clearInterval(playerTimerInterval);playerTimerInterval=null;}myTeam=null;gameState=null;allScores={};edlGamePwVerified=false;edlNetworkPwVerified=false;edlProcessingShown=false;document.getElementById('edlProcessing').style.display='none';updateEndOverlay();showScreen('screenSelect');document.getElementById('teamInfo').style.display='none';}
 else if(msg.type==='comeback_bonus_applied'){if(myTeam){requestState();}if(msg.data&&msg.data.some(b=>b.team===myTeam))showToast('⚡ 逆転ボーナス発動');}
 else if(msg.type==='edl_unlocked'){if(myTeam===EDL_TEAM){requestState();let t='🔓 新問題が解放されました！3点問題の残り + 4点問題';if(msg.early_bonus)t+=' ⚡ 早期クリアボーナス +5点！';showToast(t);}}
 else if(msg.type==='event'&&msg.data){const parts=[msg.data.bonus_msg,msg.data.penalty_msg,msg.data.message].filter(Boolean);if(parts.length)showToast(parts.join(' / '));}}
@@ -189,9 +201,9 @@ function closePwModal(){
   document.getElementById('pwModal').style.display='none';}
 function submitPw(){
   const val=document.getElementById('pwInput').value;
-  const t=document.getElementById('pwModal')._pendingTeam;
-  if(val===EDL_PASSWORD){
+  const t=document.getElementById('pwModal')._pendingTeam;  if(val===EDL_PASSWORD){
     closePwModal();
+    edlGamePwVerified=true;
     requestState();showScreen('screenList');
   }else{
     document.getElementById('pwError').textContent='❌ パスワードが違います';
@@ -199,7 +211,7 @@ function submitPw(){
     document.getElementById('pwInput').focus();}}
 // Enterキーでパスワード送信
 document.addEventListener('keydown',function(e){if(e.key==='Enter'&&document.getElementById('pwModal').style.display==='block')submitPw();});
-function backToSelect(){myTeam=null;showScreen('screenSelect');}
+function backToSelect(){myTeam=null;edlGamePwVerified=false;showScreen('screenSelect');}
 function confirmTeam(){document.getElementById('teamInfo').style.display='flex';document.getElementById('headerTeam').textContent='👥 '+myTeam;requestState();showScreen('screenWaiting');}
 function renderScoreBar(){const bar=document.getElementById('scoreBarTop');if(!bar||!gameState)return;
 const hideOthers=gameState.game_started&&gameState.remaining_seconds!==null&&gameState.remaining_seconds<SCORE_HIDE_THRESHOLD_SECONDS;
@@ -212,22 +224,25 @@ function renderList(){if(!gameState)return;
 if(Object.keys(allScores).length===0&&gameState.score!==undefined){allScores[myTeam]=gameState.score;}
 renderScoreBar();
 const area=document.getElementById('qListArea');area.innerHTML='';
+if(myTeam===EDL_TEAM&&edlProcessingShown&&!edlNetworkPwVerified){const warn=document.createElement('div');warn.style.cssText='background:rgba(0,255,65,.08);border:1px solid #00ff41;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-family:monospace;font-size:.8em;color:#00ff41;text-align:center';warn.innerHTML='⚠ SYSTEM: credential verification pending — 3点・4点問題はロック中<br><span style="color:#555;font-size:.85em">右下のターミナルでネットワークトークンを入力してください</span>';area.appendChild(warn);}
 const groups=[{pts:2,label:'⭐⭐ 2点問題（基本）',cls:'section-2pt'},{pts:3,label:'⭐⭐⭐ 3点問題（応用）',cls:'section-3pt'},{pts:4,label:'⭐⭐⭐⭐ 4点問題（難問）',cls:'section-4pt'}];
 groups.forEach(g=>{const qs=gameState.questions.filter(q=>(q.base_points||q.points)===g.pts);if(!qs.length)return;
 const sh=document.createElement('div');sh.className='section-header '+g.cls;sh.textContent=g.label;area.appendChild(sh);
 const gridDiv=document.createElement('div');gridDiv.className='q-grid';
 qs.forEach(q=>{const basePts=q.base_points||q.points;const card=document.createElement('div');
 const isLocked=q.locked;
-card.className='q-card pts-'+basePts+(q.solved?' solved':'')+(q.is_bonus?' bonus':'')+(isLocked?' locked':'');
-if(isAnswerLocked()||isLocked)card.classList.add('disabled');
+const isNetLocked=(myTeam===EDL_TEAM&&edlProcessingShown&&!edlNetworkPwVerified&&EDL_NETWORK_LOCK_PTS.includes(basePts));
+card.className='q-card pts-'+basePts+(q.solved?' solved':'')+(q.is_bonus?' bonus':'')+(isLocked?' locked':'')+(isNetLocked?' locked':'');
+if(isAnswerLocked()||isLocked||isNetLocked)card.classList.add('disabled');
 let st='未回答',sc='status-unsolved';
-if(isLocked){st='🔒 未解放';sc='status-locked';}
+if(isNetLocked){st='🔒 認証待ち';sc='status-locked';}
+else if(isLocked){st='🔒 未解放';sc='status-locked';}
 else if(q.solved){st='✅ 正解済み';sc='status-solved';}
 else if(q.wrong_count>0&&q.hint_used){st=`❌×${q.wrong_count} 💡済`;sc='status-wrong';}
 else if(q.wrong_count>0){st=`❌×${q.wrong_count}`;sc='status-wrong';}
 else if(q.hint_used){st='💡 ヒント済';sc='status-hint';}
 card.innerHTML=`<div class="q-num">Q${q.id}</div><div class="q-title">${q.title}</div><div class="q-pts">${formatPoints(q)}</div><div class="q-status ${sc}">${st}</div>`;
-card.onclick=()=>{if(!isAnswerLocked()&&!isLocked)openQuestion(q.id);};gridDiv.appendChild(card);});
+card.onclick=()=>{if(!isAnswerLocked()&&!isLocked&&!isNetLocked)openQuestion(q.id);};gridDiv.appendChild(card);});
 area.appendChild(gridDiv);});}
 function openQuestion(qid){if(isAnswerLocked()){renderEndedDetail();showScreen('screenDetail');return;}currentQid=qid;ws.send(JSON.stringify({type:'get_question',team:myTeam,question_id:qid}));showScreen('screenDetail');}
 function backToList(){requestState();showScreen('screenList');}
@@ -267,10 +282,30 @@ async function triggerEdlProcessing(){
     const data=await res.json();
     // レスポンスはNetworkタブのResponseで確認可能
     console.debug('[EDL]',data);
-  }catch(e){}
-  // Processing... アニメーション
+  }catch(e){}  // Processing... アニメーション → 3秒後に入力欄表示
   let dots=0;const dotsEl=document.getElementById('edlProcDots');
-  setInterval(()=>{dots=(dots+1)%4;dotsEl.textContent='Processing'+'...'.slice(0,dots)||'Processing';},600);}
+  const dotsInterval=setInterval(()=>{dots=(dots+1)%4;dotsEl.textContent='Processing'+'...'.slice(0,dots+1);},600);
+  setTimeout(()=>{
+    clearInterval(dotsInterval);
+    dotsEl.textContent='▶ Token required.';
+    document.getElementById('edlProcMsg').textContent='Authentication incomplete. Token needed.';
+    document.getElementById('edlNetworkPwArea').style.display='block';
+    setTimeout(()=>document.getElementById('edlNetworkPwInput').focus(),100);
+  },3000);}
+function submitNetworkPw(){
+  const val=(document.getElementById('edlNetworkPwInput').value||'').trim();
+  if(val===EDL_NETWORK_TOKEN){
+    edlNetworkPwVerified=true;
+    document.getElementById('edlProcessing').style.display='none';
+    renderList();
+    showToast('🔓 認証成功！3点・4点問題が解放されました');
+  }else{
+    document.getElementById('edlNetworkPwError').textContent='❌ トークンが違います';
+    document.getElementById('edlNetworkPwInput').value='';
+    document.getElementById('edlNetworkPwInput').focus();}}
+// Enterキーでネットワークトークン送信
+document.addEventListener('keydown',function(e){
+  if(e.key==='Enter'&&document.getElementById('edlNetworkPwArea').style.display!=='none'&&document.getElementById('edlNetworkPwInput')===document.activeElement)submitNetworkPw();});
 connect();
 </script>
 </body>
