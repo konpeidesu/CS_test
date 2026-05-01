@@ -35,7 +35,6 @@ jobs:
       - name: Login to CrowdStrike registry and pull FCS CLI container
         env:
           FALCON_API_URL: ${{ secrets.FALCON_API_URL }}
-          FALCON_CID: ${{ secrets.FALCON_CID }}
           FALCON_REGION: ${{ secrets.FALCON_REGION }}
         run: |
           TOKEN="${{ steps.falcon_token.outputs.token }}"
@@ -45,11 +44,15 @@ jobs:
             "${FALCON_API_URL}/iac/entities/image-registry-credentials/v1" \
             | jq -r '.resources.resources.token')
 
-          # CIDのチェックサム部分(-XX)を除去してユーザー名を生成
-          CID_NO_CHECKSUM=$(echo "${FALCON_CID}" | cut -d'-' -f1 | tr '[:upper:]' '[:lower:]')
-          echo "Using registry username: fh-${CID_NO_CHECKSUM}"
+          # APIからCIDを取得してユーザー名を生成
+          CS_USERNAME=$(curl -s \
+            -H "Authorization: Bearer ${TOKEN}" \
+            "${FALCON_API_URL}/iac/entities/image-registry-credentials/v1" \
+            | jq -r '.resources.resources.username')
+
+          echo "Using registry username: ${CS_USERNAME}"
           echo "$CS_PASSWORD" | docker login registry.crowdstrike.com \
-            --username "fh-${CID_NO_CHECKSUM}" \
+            --username "${CS_USERNAME}" \
             --password-stdin
 
           CS_IMAGE="registry.crowdstrike.com/fcs/${FALCON_REGION}/release/cs-fcs"
