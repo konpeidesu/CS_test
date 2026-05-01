@@ -18,7 +18,65 @@ jobs:
           mkdir -p /home/kawai/CS_test
           rsync -av --delete ./ /home/kawai/CS_test/
 
+      - name: Download and install FCS CLI
+        env:
+          FALCON_CLIENT_ID: ${{ secrets.FALCON_CLIENT_ID }}
+          FALCON_CLIENT_SECRET: ${{ secrets.FALCON_CLIENT_SECRET }}
+          FALCON_API_URL: ${{ secrets.FALCON_API_URL }}
+        run: |
+          TOKEN=$(curl -s -X POST \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            --data-urlencode "client_id=${FALCON_CLIENT_ID}" \
+            --data-urlencode "client_secret=${FALCON_CLIENT_SECRET}" \
+            "${FALCON_API_URL}/oauth2/token" | jq -r '.access_token')
+
+          FCS_URL=$(curl -s -G \
+            -H "Authorization: Bearer ${TOKEN}" \
+            -H "accept: application/json" \
+            --data-urlencode 'filter=category:"fcs"+os:"linux"+arch:"amd64"' \
+            "${FALCON_API_URL}/csdownloads/combined/files-download/v2" \
+            | jq -r '.resources[0].download_info.download_url')
+
+          curl -L -o /tmp/fcs.tar.gz "${FCS_URL}"
+          tar -xvzf /tmp/fcs.tar.gz -C /tmp
+          chmod +x /tmp/fcs
+          sudo mv /tmp/fcs /usr/local/bin/fcs
+
+      - name: Build image for FCS scan
+        run: |
+          cd /home/kawai/CS_test
+          docker compose build
+
+      - name: Run FCS image scan
+        env:
+          FALCON_CLIENT_ID: ${{ secrets.FALCON_CLIENT_ID }}
+          FALCON_CLIENT_SECRET: ${{ secrets.FALCON_CLIENT_SECRET }}
+          FALCON_CLOUD: ${{ secrets.FALCON_CLOUD }}
+        run: |
+          cd /home/kawai/CS_test
+
+          IMAGE_NAME=$(docker compose config | awk '/image:/ {print $2; exit}')
+
+          if [ -z "$IMAGE_NAME" ]; then
+            echo "docker-compose.yml に image: が定義されていません。"
+            echo "FCSでスキャンするイメージ名を特定できないため停止します。"
+            exit 1
+          fi
+
+          fcs scan image "$IMAGE_NAME" --output json > fcs-result.json
+
+      - name: Block deploy on Critical or High findings
+        run: |
+          cd /home/kawai/CS_test
+
+          if jq -e '.findings[] | select(.severity == "critical" or .severity == "high")' fcs-result.json > /dev/null; then
+            echo "Critical or High findings detected. Deployment blocked."
+            exit 1
+          fi
+
+          echo "No Critical or High findings detected. Continue deployment."
+
       - name: Deploy with Docker Compose
         run: |
           cd /home/kawai/CS_test
-          docker compose up -d --build
+          docker compose up -d

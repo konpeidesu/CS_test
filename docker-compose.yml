@@ -1,6 +1,7 @@
 services:
    app:
     build: .
+    image: cs_test-app:latest
     ports:
       - "172.22.187.44:80:8000"
     volumes:
