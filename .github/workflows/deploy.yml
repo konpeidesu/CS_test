@@ -37,25 +37,30 @@ jobs:
           FALCON_API_URL: ${{ secrets.FALCON_API_URL }}
           FALCON_REGION: ${{ secrets.FALCON_REGION }}
           FALCON_CID: ${{ secrets.FALCON_CID }}
+          FALCON_CLIENT_ID: ${{ secrets.FALCON_CLIENT_ID }}
+          FALCON_CLIENT_SECRET: ${{ secrets.FALCON_CLIENT_SECRET }}
         run: |
-          TOKEN="${{ steps.falcon_token.outputs.token }}"
+          # トークンをこのステップで再取得（期限切れ対策）
+          TOKEN=$(curl -s -X POST \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            --data-urlencode "client_id=${FALCON_CLIENT_ID}" \
+            --data-urlencode "client_secret=${FALCON_CLIENT_SECRET}" \
+            "${FALCON_API_URL}/oauth2/token" | jq -r '.access_token')
 
           CS_PASSWORD=$(curl -s \
             -H "Authorization: Bearer ${TOKEN}" \
             "${FALCON_API_URL}/iac/entities/image-registry-credentials/v1" \
             | jq -r '.resources.token')
 
-          # CIDのチェックサム部分(-XX)を除去・小文字化してユーザー名を生成
           CID_NO_CHECKSUM=$(echo "${FALCON_CID}" | sed 's/-[^-]*$//' | tr '[:upper:]' '[:lower:]')
           CS_USERNAME="fh-${CID_NO_CHECKSUM}"
           echo "Using registry username: ${CS_USERNAME}"
           echo "Using region: ${FALCON_REGION}"
           echo "Password length: ${#CS_PASSWORD}"
-          echo "CS_IMAGE: registry.crowdstrike.com/fcs/${FALCON_REGION}/release/cs-fcs"
 
           echo "$CS_PASSWORD" | docker login registry.crowdstrike.com \
             --username "${CS_USERNAME}" \
-            --password-stdin 2>&1 || true
+            --password-stdin
 
           CS_IMAGE="registry.crowdstrike.com/fcs/${FALCON_REGION}/release/cs-fcs"
           docker pull "${CS_IMAGE}:latest"
