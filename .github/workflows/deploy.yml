@@ -64,7 +64,7 @@ jobs:
             exit 1
           fi
 
-          fcs scan image "$IMAGE_NAME" --output json > fcs-result.json
+          fcs image scan --image "$IMAGE_NAME" --json-output > fcs-result.json
 
       - name: Block deploy on Critical or High findings
         run: |
