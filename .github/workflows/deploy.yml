@@ -39,16 +39,16 @@ jobs:
         run: |
           TOKEN="${{ steps.falcon_token.outputs.token }}"
 
-          CS_PASSWORD=$(curl -s \
+          # APIレスポンス全体を確認（デバッグ）
+          CRED_RESPONSE=$(curl -s \
             -H "Authorization: Bearer ${TOKEN}" \
-            "${FALCON_API_URL}/iac/entities/image-registry-credentials/v1" \
-            | jq -r '.resources.resources.token')
+            "${FALCON_API_URL}/iac/entities/image-registry-credentials/v1")
 
-          # APIからCIDを取得してユーザー名を生成
-          CS_USERNAME=$(curl -s \
-            -H "Authorization: Bearer ${TOKEN}" \
-            "${FALCON_API_URL}/iac/entities/image-registry-credentials/v1" \
-            | jq -r '.resources.resources.username')
+          echo "=== credential API response structure ==="
+          echo "${CRED_RESPONSE}" | jq 'keys, .resources'
+
+          CS_PASSWORD=$(echo "${CRED_RESPONSE}" | jq -r '.resources.resources.token // .resources[0].token // empty')
+          CS_USERNAME=$(echo "${CRED_RESPONSE}" | jq -r '.resources.resources.username // .resources[0].username // empty')
 
           echo "Using registry username: ${CS_USERNAME}"
           echo "$CS_PASSWORD" | docker login registry.crowdstrike.com \
