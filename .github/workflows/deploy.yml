@@ -49,6 +49,9 @@ jobs:
           cd /home/kawai/CS_test
           docker compose build
 
+      - name: Check FCS CLI help
+        run: fcs --help || true
+
       - name: Run FCS image scan
         env:
           FALCON_CLIENT_ID: ${{ secrets.FALCON_CLIENT_ID }}
