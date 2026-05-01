@@ -47,10 +47,14 @@ jobs:
             --data-urlencode "client_secret=${FALCON_CLIENT_SECRET}" \
             "${FALCON_API_URL}/oauth2/token" | jq -r '.access_token')
 
-          CS_PASSWORD=$(curl -s \
+          CS_CRED_RESP=$(curl -s \
             -H "Authorization: Bearer ${TOKEN}" \
-            "${FALCON_API_URL}/iac/entities/image-registry-credentials/v1" \
-            | jq -r '.resources.token')
+            "${FALCON_API_URL}/iac/entities/image-registry-credentials/v1")
+
+          echo "=== registry credential response ==="
+          echo "${CS_CRED_RESP}" | jq '.'
+
+          CS_PASSWORD=$(echo "${CS_CRED_RESP}" | jq -r '.resources.token // .resources[0].token // empty')
 
           CID_NO_CHECKSUM=$(echo "${FALCON_CID}" | sed 's/-[^-]*$//' | tr '[:upper:]' '[:lower:]')
           CS_USERNAME="fh-${CID_NO_CHECKSUM}"
