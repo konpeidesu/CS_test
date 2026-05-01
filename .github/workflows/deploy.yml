@@ -46,7 +46,8 @@ jobs:
             | jq -r '.resources.resources.token')
 
           # CIDのチェックサム部分(-XX)を除去してユーザー名を生成
-          CID_NO_CHECKSUM=$(echo "${FALCON_CID}" | cut -d'-' -f1)
+          CID_NO_CHECKSUM=$(echo "${FALCON_CID}" | cut -d'-' -f1 | tr '[:upper:]' '[:lower:]')
+          echo "Using registry username: fh-${CID_NO_CHECKSUM}"
           echo "$CS_PASSWORD" | docker login registry.crowdstrike.com \
             --username "fh-${CID_NO_CHECKSUM}" \
             --password-stdin
