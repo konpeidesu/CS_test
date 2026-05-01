@@ -45,8 +45,10 @@ jobs:
             "${FALCON_API_URL}/iac/entities/image-registry-credentials/v1" \
             | jq -r '.resources.resources.token')
 
+          # CIDのチェックサム部分(-XX)を除去してユーザー名を生成
+          CID_NO_CHECKSUM=$(echo "${FALCON_CID}" | cut -d'-' -f1)
           echo "$CS_PASSWORD" | docker login registry.crowdstrike.com \
-            --username "fh-${FALCON_CID}" \
+            --username "fh-${CID_NO_CHECKSUM}" \
             --password-stdin
 
           CS_IMAGE="registry.crowdstrike.com/fcs/${FALCON_REGION}/release/cs-fcs"
