@@ -52,9 +52,9 @@ jobs:
             "${FALCON_API_URL}/iac/entities/image-registry-credentials/v1")
 
           echo "=== registry credential response ==="
-          echo "${CS_CRED_RESP}" | jq '.'
+          echo "${CS_CRED_RESP}" | jq '.resources.resources'
 
-          CS_PASSWORD=$(echo "${CS_CRED_RESP}" | jq -r '.resources.token // .resources[0].token // empty')
+          CS_PASSWORD=$(echo "${CS_CRED_RESP}" | jq -r '.resources.resources.token')
 
           CID_NO_CHECKSUM=$(echo "${FALCON_CID}" | sed 's/-[^-]*$//' | tr '[:upper:]' '[:lower:]')
           CS_USERNAME="fh-${CID_NO_CHECKSUM}"
