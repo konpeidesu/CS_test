@@ -1,4 +1,4 @@
-name: Deploy to VM
+﻿name: Deploy to VM
 
 on:
   push:
@@ -18,7 +18,8 @@ jobs:
           mkdir -p /home/kawai/CS_test
           rsync -av --delete ./ /home/kawai/CS_test/
 
-      - name: Download and install FCS CLI
+      - name: Get Falcon access token
+        id: falcon_token
         env:
           FALCON_CLIENT_ID: ${{ secrets.FALCON_CLIENT_ID }}
           FALCON_CLIENT_SECRET: ${{ secrets.FALCON_CLIENT_SECRET }}
@@ -29,6 +30,78 @@ jobs:
             --data-urlencode "client_id=${FALCON_CLIENT_ID}" \
             --data-urlencode "client_secret=${FALCON_CLIENT_SECRET}" \
             "${FALCON_API_URL}/oauth2/token" | jq -r '.access_token')
+          echo "token=${TOKEN}" >> $GITHUB_OUTPUT
+
+      - name: Login to CrowdStrike registry and pull FCS CLI container
+        env:
+          FALCON_API_URL: ${{ secrets.FALCON_API_URL }}
+          FALCON_CID: ${{ secrets.FALCON_CID }}
+          FALCON_REGION: ${{ secrets.FALCON_REGION }}
+        run: |
+          TOKEN="${{ steps.falcon_token.outputs.token }}"
+
+          CS_PASSWORD=$(curl -s \
+            -H "Authorization: Bearer ${TOKEN}" \
+            "${FALCON_API_URL}/iac/entities/image-registry-credentials/v1" \
+            | jq -r '.resources.resources.token')
+
+          echo "$CS_PASSWORD" | docker login registry.crowdstrike.com \
+            --username "fh-${FALCON_CID}" \
+            --password-stdin
+
+          CS_IMAGE="registry.crowdstrike.com/fcs/${FALCON_REGION}/release/cs-fcs"
+          docker pull "${CS_IMAGE}:latest"
+          docker tag "${CS_IMAGE}:latest" fcs:local
+
+      - name: Build application image
+        run: |
+          cd /home/kawai/CS_test
+          docker compose build
+
+      - name: Run FCS image scan
+        env:
+          FALCON_CLIENT_ID: ${{ secrets.FALCON_CLIENT_ID }}
+          FALCON_CLIENT_SECRET: ${{ secrets.FALCON_CLIENT_SECRET }}
+          FALCON_REGION: ${{ secrets.FALCON_REGION }}
+        run: |
+          cd /home/kawai/CS_test
+
+          IMAGE_NAME=$(docker compose config --format json | jq -r '.services[].image // empty' | head -1)
+
+          if [ -z "$IMAGE_NAME" ]; then
+            echo "No image name found in docker-compose.yml. Stopping."
+            exit 1
+          fi
+
+          echo "Scanning image: ${IMAGE_NAME}"
+
+          set +e
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            fcs:local scan image "${IMAGE_NAME}" \
+            --client-id "${FALCON_CLIENT_ID}" \
+            --client-secret "${FALCON_CLIENT_SECRET}" \
+            --falcon-region "${FALCON_REGION}"
+          SCAN_EXIT=$?
+          set -e
+
+          echo "FCS scan exit code: ${SCAN_EXIT}"
+
+          # exit 1 = block (policy violation), exit 2 = alert only
+          if [ "$SCAN_EXIT" -eq 1 ]; then
+            echo "Image blocked by policy. Deployment stopped."
+            exit 1
+          elif [ "$SCAN_EXIT" -eq 2 ]; then
+            echo "WARNING: Policy alert detected, but continuing deployment."
+          else
+            echo "Image passed policy check."
+          fi
+
+      - name: Download and install FCS CLI (for IaC scan)
+        env:
+          FALCON_API_URL: ${{ secrets.FALCON_API_URL }}
+        run: |
+          TOKEN="${{ steps.falcon_token.outputs.token }}"
 
           FCS_URL=$(curl -s -G \
             -H "Authorization: Bearer ${TOKEN}" \
@@ -44,44 +117,27 @@ jobs:
           mv /tmp/fcs "$HOME/bin/fcs"
           echo "$HOME/bin" >> $GITHUB_PATH
 
-      - name: Build image for FCS scan
-        run: |
-          cd /home/kawai/CS_test
-          docker compose build
-
-      - name: Check FCS CLI help
-        run: fcs --help || true
-
-      - name: Run FCS image scan
+      - name: Run FCS IaC scan
         env:
-          FALCON_CLIENT_ID: ${{ secrets.FALCON_CLIENT_ID }}
-          FALCON_CLIENT_SECRET: ${{ secrets.FALCON_CLIENT_SECRET }}
-          FALCON_CLOUD: ${{ secrets.FALCON_CLOUD }}
+          FALCON_FCS_CLIENT_ID: ${{ secrets.FALCON_CLIENT_ID }}
+          FALCON_FCS_CLIENT_SECRET: ${{ secrets.FALCON_CLIENT_SECRET }}
+          FALCON_FCS_FALCON_REGION: ${{ secrets.FALCON_REGION }}
         run: |
-          cd /home/kawai/CS_test
+          set +e
+          fcs iac scan -p /home/kawai/CS_test --upload-results
+          IAC_EXIT=$?
+          set -e
 
-          IMAGE_NAME=$(docker compose config --format json | jq -r '.services[].image // empty' | head -1)
+          echo "FCS IaC scan exit code: ${IAC_EXIT}"
 
-          if [ -z "$IMAGE_NAME" ]; then
-            echo "No image name found in docker-compose.yml. Stopping."
+          if [ "$IAC_EXIT" -eq 1 ]; then
+            echo "IaC scan: critical findings detected. Deployment stopped."
             exit 1
+          elif [ "$IAC_EXIT" -eq 2 ]; then
+            echo "WARNING: IaC alert findings detected, continuing deployment."
+          else
+            echo "IaC scan passed."
           fi
-
-          fcs image scan --image "$IMAGE_NAME" --json-output > fcs-result.json
-
-      - name: Block deploy on Critical or High findings
-        run: |
-          cd /home/kawai/CS_test
-
-          echo "=== FCS scan result ==="
-          cat fcs-result.json
-
-          if jq -e '[.findings[]? | select(.severity == "critical" or .severity == "high")] | length > 0' fcs-result.json > /dev/null 2>&1; then
-            echo "Critical or High findings detected. Deployment blocked."
-            exit 1
-          fi
-
-          echo "No Critical or High findings detected. Continue deployment."
 
       - name: Deploy with Docker Compose
         run: |
