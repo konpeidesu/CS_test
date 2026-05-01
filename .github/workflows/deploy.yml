@@ -67,6 +67,13 @@ jobs:
             --password-stdin
 
           CS_IMAGE="registry.crowdstrike.com/fcs/${FALCON_REGION}/release/cs-fcs"
+          echo "Pulling: ${CS_IMAGE}:latest"
+
+          # タグ一覧を確認
+          curl -s -u "${CS_USERNAME}:${CS_PASSWORD}" \
+            "https://registry.crowdstrike.com/v2/fcs/${FALCON_REGION}/release/cs-fcs/tags/list" \
+            | jq '.' || true
+
           docker pull "${CS_IMAGE}:latest"
           docker tag "${CS_IMAGE}:latest" fcs:local
 
