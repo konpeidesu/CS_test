@@ -49,10 +49,13 @@ jobs:
           CID_NO_CHECKSUM=$(echo "${FALCON_CID}" | sed 's/-[^-]*$//' | tr '[:upper:]' '[:lower:]')
           CS_USERNAME="fh-${CID_NO_CHECKSUM}"
           echo "Using registry username: ${CS_USERNAME}"
+          echo "Using region: ${FALCON_REGION}"
+          echo "Password length: ${#CS_PASSWORD}"
+          echo "CS_IMAGE: registry.crowdstrike.com/fcs/${FALCON_REGION}/release/cs-fcs"
 
           echo "$CS_PASSWORD" | docker login registry.crowdstrike.com \
             --username "${CS_USERNAME}" \
-            --password-stdin
+            --password-stdin 2>&1 || true
 
           CS_IMAGE="registry.crowdstrike.com/fcs/${FALCON_REGION}/release/cs-fcs"
           docker pull "${CS_IMAGE}:latest"
